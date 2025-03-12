@@ -1,8 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:ppwd_frontend/repository/platform_repository.dart';
+import 'package:ppwd_frontend/services/sensor_service.dart';
+import 'package:ppwd_frontend/utils.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -27,34 +28,37 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-                ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      // @TODO, mac address need to be configurable
-                      connect("C1:74:71:F3:94:E0");
-                      Timer.periodic(Duration(seconds: 2), (timer) async {
-                        List<String>? data = await _repository.getSensorData();
-                        if (data != null && !data.isEmpty) {
-                          setState(() {
-                            sensorData = data.first;
-                          });
-                        }
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  // @TODO, mac address need to be configurable
+                  connect(getMacAddress(2));
+                  // connect("C1:74:71:F3:94:E0");
+                  Timer.periodic(Duration(seconds: 2), (timer) async {
+                    List<String>? data = await _repository.getSensorData();
+                    if (data != null && data.isNotEmpty) {
+                      setState(() {
+                        sensorData = data.first;
                       });
-                    });
-                  },
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        "Connect to device",
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
+                      await SensorService().sendSensorData(data);
+                    }
+                  });
+                });
+              },
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    "Connect to device",
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),Text(sensorData, style: TextStyle(fontSize: 20))
+                ],
+              ),
+            ),
+            Text(sensorData, style: TextStyle(fontSize: 20))
           ],
         ),
       ),
