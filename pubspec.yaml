@@ -40,6 +40,7 @@ dependencies:
 
   # bluetooth permission
   permission_handler: ^11.4.0
+  optional: ^6.1.0+1
 
 dev_dependencies:
   flutter_test:

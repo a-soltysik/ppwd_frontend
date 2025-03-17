@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:ppwd_frontend/repository/platform_repository.dart';
@@ -13,11 +14,11 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final _repository = PlatformRepository();
-  String sensorData = "N/A";
+  final _repository = PlatformRepository(getMacAddress(1));
+  String battery = "N/A";
 
-  connect(String mac) async {
-    await _repository.connectToDevice(mac);
+  _connect() async {
+    await _repository.connectToDevice();
   }
 
   @override
@@ -32,16 +33,24 @@ class _HomePageState extends State<HomePage> {
               onPressed: () {
                 setState(() {
                   // @TODO, mac address need to be configurable
-                  connect(getMacAddress(2));
-                  // connect("C1:74:71:F3:94:E0");
+                  _connect();
                   Timer.periodic(Duration(seconds: 2), (timer) async {
-                    List<String>? data = await _repository.getSensorData();
-                    if (data != null && data.isNotEmpty) {
-                      setState(() {
-                        sensorData = data.first;
+                    var data = await _repository.getModuleData();
+                    data.filter((list) => list.isNotEmpty).ifPresent((
+                      value,
+                    ) async {
+                      //@TODO update GUI
+                      await SensorService().sendSensorData(
+                        Board(getMacAddress(1), value),
+                      );
+                      (await _repository.getBatteryLevel()).ifPresent((
+                        batteryLevel,
+                      ) {
+                        setState(() {
+                          battery = batteryLevel.toString();
+                        });
                       });
-                      await SensorService().sendSensorData(data);
-                    }
+                    }, orElse: () => log("No data received from board"));
                   });
                 });
               },
@@ -58,7 +67,7 @@ class _HomePageState extends State<HomePage> {
                 ],
               ),
             ),
-            Text(sensorData, style: TextStyle(fontSize: 20))
+            Text(battery, style: TextStyle(fontSize: 20)),
           ],
         ),
       ),
