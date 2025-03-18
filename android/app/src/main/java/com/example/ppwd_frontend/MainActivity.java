@@ -132,8 +132,9 @@ public class MainActivity extends FlutterActivity implements ServiceConnection {
         var accelerometer = board.getModule(Accelerometer.class);
         if (accelerometer != null) {
             accelerometer.acceleration().addRouteAsync(source -> source.stream((data, env) -> {
-                var measurement = data.value(Acceleration.class).toString();
-                var timestamp = new Date().getTime();
+                Acceleration measurementValue = data.value(Acceleration.class);
+                String measurement = measurementValue.toString();
+                long timestamp = new Date().getTime();
 
                 sensorDataBuffer.computeIfAbsent(
                         MeasurementType.ACCELERATION.toString(),
@@ -151,8 +152,9 @@ public class MainActivity extends FlutterActivity implements ServiceConnection {
         var ambientLight = board.getModule(AmbientLightLtr329.class);
         if (ambientLight != null) {
             ambientLight.illuminance().addRouteAsync(source -> source.stream((data, env) -> {
-                var measurement = data.value(float.class).toString();
-                var timestamp = new Date().getTime();
+                Float measurementValue = data.value(Float.class);
+                String measurement = measurementValue.toString();
+                long timestamp = new Date().getTime();
 
                 sensorDataBuffer.computeIfAbsent(
                         MeasurementType.ILLUMINANCE.toString(),
@@ -169,8 +171,9 @@ public class MainActivity extends FlutterActivity implements ServiceConnection {
         var barometerBosch = board.getModule(BarometerBosch.class);
         if (barometerBosch != null) {
             barometerBosch.altitude().addRouteAsync(source -> source.stream((data, env) -> {
-                var measurement = data.value(float.class).toString();
-                var timestamp = new Date().getTime();
+                Float measurementValue = data.value(Float.class);
+                String measurement = measurementValue.toString();
+                long timestamp = new Date().getTime();
 
                 sensorDataBuffer.computeIfAbsent(
                         MeasurementType.ALTITUDE.toString(),
@@ -183,8 +186,9 @@ public class MainActivity extends FlutterActivity implements ServiceConnection {
             });
 
             barometerBosch.pressure().addRouteAsync(source -> source.stream((data, env) -> {
-                var measurement = data.value(float.class).toString();
-                var timestamp = new Date().getTime();
+                Float measurementValue = data.value(Float.class);
+                String measurement = measurementValue.toString();
+                long timestamp = new Date().getTime();
 
                 sensorDataBuffer.computeIfAbsent(
                         MeasurementType.PRESSURE.toString(),
@@ -217,8 +221,9 @@ public class MainActivity extends FlutterActivity implements ServiceConnection {
         var gyro = board.getModule(Gyro.class);
         if (gyro != null) {
             gyro.angularVelocity().addRouteAsync(source -> source.stream((data, env) -> {
-                var measurement = data.value(AngularVelocity.class).toString();
-                var timestamp = new Date().getTime();
+                AngularVelocity measurementValue = data.value(AngularVelocity.class);
+                String measurement = measurementValue.toString();
+                long timestamp = new Date().getTime();
 
                 sensorDataBuffer.computeIfAbsent(
                         MeasurementType.ANGULAR_VELOCITY.toString(),
@@ -236,8 +241,9 @@ public class MainActivity extends FlutterActivity implements ServiceConnection {
         var humidity = board.getModule(HumidityBme280.class);
         if (humidity != null) {
             humidity.value().addRouteAsync(source -> source.stream((data, env) -> {
-                var measurement = data.value(float.class).toString();
-                var timestamp = new Date().getTime();
+                Float measurementValue = data.value(Float.class);
+                String measurement = measurementValue.toString();
+                long timestamp = new Date().getTime();
 
                 sensorDataBuffer.computeIfAbsent(
                         MeasurementType.HUMIDITY.toString(),
@@ -284,9 +290,14 @@ public class MainActivity extends FlutterActivity implements ServiceConnection {
     private void setupSettings() {
         var settings = board.getModule(Settings.class);
         if (settings != null) {
-            settings.battery().addRouteAsync(source -> source.stream((data, env) ->
-                    batteryLevel = data.value(Settings.BatteryState.class).charge
-            ));
+            settings.battery().addRouteAsync(source ->
+                source.stream((data, env) -> {
+                    batteryLevel = data.value(Settings.BatteryState.class).charge;
+                })
+            ).continueWith(task -> {
+                settings.battery().read();
+                return null;
+            });
         }
     }
 
