@@ -34,7 +34,7 @@ class _HomePageState extends State<HomePage> {
                 setState(() {
                   // @TODO, mac address need to be configurable
                   _connect();
-                  Timer.periodic(Duration(seconds: 2), (timer) async {
+                  Timer.periodic(Duration(seconds: 60), (timer) async {
                     var data = await _repository.getModuleData();
                     data.filter((list) => list.isNotEmpty).ifPresent((
                       value,

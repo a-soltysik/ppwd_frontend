@@ -10,6 +10,7 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 
+import com.mbientlab.metawear.Data;
 import com.mbientlab.metawear.MetaWearBoard;
 import com.mbientlab.metawear.android.BtleService;
 import com.mbientlab.metawear.data.Acceleration;
@@ -42,6 +43,7 @@ public class MainActivity extends FlutterActivity implements ServiceConnection {
     private static final String getModuleDataFunction = "getModulesData";
     private static final String getBatteryLevelFunction = "getBatteryLevel";
     private static final String handleBoardDisconnection = "handleBoardDisconnection";
+    private static final long dataFetchingPeriodInMillis = 500;
     private final Map<String, List<List<Object>>> sensorDataBuffer = new ConcurrentHashMap<>();
     private BtleService.LocalBinder serviceBinder;
     private MetaWearBoard board;
@@ -128,18 +130,34 @@ public class MainActivity extends FlutterActivity implements ServiceConnection {
         setupSettings();
     }
 
+    private boolean shouldFetchMeasurement(MeasurementType type) {
+        var measurements = sensorDataBuffer.get(type.toString());
+        if (measurements != null && !measurements.isEmpty()) {
+            List<Object> lastMeasurement = measurements.get(measurements.size() - 1);
+            Long lastTimestamp = (Long) lastMeasurement.get(1);
+
+            return (new Date().getTime() - lastTimestamp) > dataFetchingPeriodInMillis;
+        }
+        return true;
+    }
+
+    private <T> void performMeasurement(MeasurementType type, Class<T> sensor, Data data) {
+        if (shouldFetchMeasurement(type)) {
+            var measurement = data.value(sensor).toString();
+            var timestamp = new Date().getTime();
+
+            sensorDataBuffer.computeIfAbsent(
+                    type.toString(),
+                    key -> new CopyOnWriteArrayList<>()
+            ).add(List.of(cleanedUpString(measurement), timestamp));
+        }
+    }
+
     private void setupAccelerometer() {
         var accelerometer = board.getModule(Accelerometer.class);
         if (accelerometer != null) {
             accelerometer.acceleration().addRouteAsync(source -> source.stream((data, env) -> {
-                Acceleration measurementValue = data.value(Acceleration.class);
-                String measurement = measurementValue.toString();
-                long timestamp = new Date().getTime();
-
-                sensorDataBuffer.computeIfAbsent(
-                        MeasurementType.ACCELERATION.toString(),
-                        key -> new CopyOnWriteArrayList<>()
-                ).add(List.of(cleanedUpString(measurement), timestamp));
+                performMeasurement(MeasurementType.ACCELERATION, Acceleration.class, data);
             })).continueWith(task -> {
                 accelerometer.acceleration().start();
                 accelerometer.start();
@@ -152,14 +170,7 @@ public class MainActivity extends FlutterActivity implements ServiceConnection {
         var ambientLight = board.getModule(AmbientLightLtr329.class);
         if (ambientLight != null) {
             ambientLight.illuminance().addRouteAsync(source -> source.stream((data, env) -> {
-                Float measurementValue = data.value(Float.class);
-                String measurement = measurementValue.toString();
-                long timestamp = new Date().getTime();
-
-                sensorDataBuffer.computeIfAbsent(
-                        MeasurementType.ILLUMINANCE.toString(),
-                        key -> new CopyOnWriteArrayList<>()
-                ).add(List.of(cleanedUpString(measurement), timestamp));
+                performMeasurement(MeasurementType.ILLUMINANCE, float.class, data);
             })).continueWith(task -> {
                 ambientLight.illuminance().start();
                 return null;
@@ -171,31 +182,17 @@ public class MainActivity extends FlutterActivity implements ServiceConnection {
         var barometerBosch = board.getModule(BarometerBosch.class);
         if (barometerBosch != null) {
             barometerBosch.altitude().addRouteAsync(source -> source.stream((data, env) -> {
-                Float measurementValue = data.value(Float.class);
-                String measurement = measurementValue.toString();
-                long timestamp = new Date().getTime();
-
-                sensorDataBuffer.computeIfAbsent(
-                        MeasurementType.ALTITUDE.toString(),
-                        key -> new CopyOnWriteArrayList<>()
-                ).add(List.of(cleanedUpString(measurement), timestamp));
+                performMeasurement(MeasurementType.ALTITUDE, float.class, data);
             })).continueWith(task -> {
-                barometerBosch.altitude();
+                barometerBosch.altitude().start();
                 barometerBosch.start();
                 return null;
             });
 
             barometerBosch.pressure().addRouteAsync(source -> source.stream((data, env) -> {
-                Float measurementValue = data.value(Float.class);
-                String measurement = measurementValue.toString();
-                long timestamp = new Date().getTime();
-
-                sensorDataBuffer.computeIfAbsent(
-                        MeasurementType.PRESSURE.toString(),
-                        key -> new CopyOnWriteArrayList<>()
-                ).add(List.of(cleanedUpString(measurement), timestamp));
+                performMeasurement(MeasurementType.PRESSURE, float.class, data);
             })).continueWith(task -> {
-                barometerBosch.pressure();
+                barometerBosch.pressure().start();
                 barometerBosch.start();
                 return null;
             });
@@ -206,13 +203,7 @@ public class MainActivity extends FlutterActivity implements ServiceConnection {
         var colorTcs = board.getModule(ColorTcs34725.class);
         if (colorTcs != null) {
             colorTcs.adc().addRouteAsync(source -> source.stream((data, env) -> {
-                var measurement = data.value(ColorTcs34725.ColorAdc.class).toString();
-                var timestamp = new Date().getTime();
-
-                sensorDataBuffer.computeIfAbsent(
-                        MeasurementType.COLOR_ADC.toString(),
-                        key -> new CopyOnWriteArrayList<>()
-                ).add(List.of(cleanedUpString(measurement), timestamp));
+                performMeasurement(MeasurementType.COLOR_ADC, ColorTcs34725.ColorAdc.class, data);
             }));
         }
     }
@@ -221,14 +212,7 @@ public class MainActivity extends FlutterActivity implements ServiceConnection {
         var gyro = board.getModule(Gyro.class);
         if (gyro != null) {
             gyro.angularVelocity().addRouteAsync(source -> source.stream((data, env) -> {
-                AngularVelocity measurementValue = data.value(AngularVelocity.class);
-                String measurement = measurementValue.toString();
-                long timestamp = new Date().getTime();
-
-                sensorDataBuffer.computeIfAbsent(
-                        MeasurementType.ANGULAR_VELOCITY.toString(),
-                        key -> new CopyOnWriteArrayList<>()
-                ).add(List.of(cleanedUpString(measurement), timestamp));
+                performMeasurement(MeasurementType.ANGULAR_VELOCITY, AngularVelocity.class, data);
             })).continueWith(task -> {
                 gyro.angularVelocity().start();
                 gyro.start();
@@ -241,14 +225,7 @@ public class MainActivity extends FlutterActivity implements ServiceConnection {
         var humidity = board.getModule(HumidityBme280.class);
         if (humidity != null) {
             humidity.value().addRouteAsync(source -> source.stream((data, env) -> {
-                Float measurementValue = data.value(Float.class);
-                String measurement = measurementValue.toString();
-                long timestamp = new Date().getTime();
-
-                sensorDataBuffer.computeIfAbsent(
-                        MeasurementType.HUMIDITY.toString(),
-                        key -> new CopyOnWriteArrayList<>()
-                ).add(List.of(cleanedUpString(measurement), timestamp));
+                performMeasurement(MeasurementType.HUMIDITY, float.class, data);
             }));
         }
     }
@@ -257,13 +234,7 @@ public class MainActivity extends FlutterActivity implements ServiceConnection {
         var magnetometer = board.getModule(MagnetometerBmm150.class);
         if (magnetometer != null) {
             magnetometer.magneticField().addRouteAsync(source -> source.stream((data, env) -> {
-                var measurement = data.value(MagneticField.class).toString();
-                var timestamp = new Date().getTime();
-
-                sensorDataBuffer.computeIfAbsent(
-                        MeasurementType.MAGNETIC_FIELD.toString(),
-                        key -> new CopyOnWriteArrayList<>()
-                ).add(List.of(cleanedUpString(measurement), timestamp));
+                performMeasurement(MeasurementType.MAGNETIC_FIELD, MagneticField.class, data);
             })).continueWith(task -> {
                 magnetometer.magneticField().start();
                 magnetometer.start();
@@ -276,13 +247,7 @@ public class MainActivity extends FlutterActivity implements ServiceConnection {
         var proximity = board.getModule(ProximityTsl2671.class);
         if (proximity != null) {
             proximity.adc().addRouteAsync(source -> source.stream((data, env) -> {
-                var measurement = data.value(int.class).toString();
-                var timestamp = new Date().getTime();
-
-                sensorDataBuffer.computeIfAbsent(
-                        MeasurementType.PROXIMITY_ADC.toString(),
-                        key -> new CopyOnWriteArrayList<>()
-                ).add(List.of(cleanedUpString(measurement), timestamp));
+                performMeasurement(MeasurementType.PROXIMITY_ADC, int.class, data);
             }));
         }
     }
@@ -291,9 +256,9 @@ public class MainActivity extends FlutterActivity implements ServiceConnection {
         var settings = board.getModule(Settings.class);
         if (settings != null) {
             settings.battery().addRouteAsync(source ->
-                source.stream((data, env) -> {
-                    batteryLevel = data.value(Settings.BatteryState.class).charge;
-                })
+                    source.stream((data, env) -> {
+                        batteryLevel = data.value(Settings.BatteryState.class).charge;
+                    })
             ).continueWith(task -> {
                 settings.battery().read();
                 return null;
