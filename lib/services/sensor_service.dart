@@ -16,7 +16,6 @@ class SensorService {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(boardData),
       );
-
       log(jsonEncode(boardData));
 
       if (response.statusCode == 200) {
