@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:ppwd_frontend/pages/home_page.dart';
+import 'package:ppwd_frontend/pages/nav_bar.dart';
 
 void main() {
   runApp(MyApp());
@@ -34,7 +35,7 @@ class _MyAppState extends State<MyApp> {
       title: 'Flutter Java',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(primaryColor: Colors.orange),
-      home: HomePage(),
+      home: NavBar(), //main page
     );
   }
 }

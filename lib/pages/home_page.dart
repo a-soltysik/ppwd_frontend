@@ -14,11 +14,11 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final _repository = PlatformRepository(getMacAddress(1));
+  final _repository = PlatformRepository();
   String battery = "N/A";
   TextEditingController _controller = TextEditingController();
 
-  _connect(String mac) async {
+  connect(String mac) async {
     await _repository.connectToDevice(context, mac);
   }
 
@@ -33,8 +33,7 @@ class _HomePageState extends State<HomePage> {
             ElevatedButton(
               onPressed: () {
                 setState(() {
-                  // @TODO, mac address need to be configurable
-                  _connect(_controller.text);
+                  connect(_controller.text);
                   Timer.periodic(Duration(seconds: 60), (timer) async {
                     var data = await _repository.getModuleData(context);
                     data.filter((list) => list.isNotEmpty).ifPresent((
