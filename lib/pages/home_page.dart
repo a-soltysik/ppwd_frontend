@@ -17,7 +17,7 @@ class _HomePageState extends State<HomePage> {
   String sensorData = "N/A";
 
   connect(String mac) async {
-    await _repository.connectToDevice(mac);
+    await _repository.connectToDevice(context, mac);
   }
 
   @override
@@ -32,7 +32,7 @@ class _HomePageState extends State<HomePage> {
               onPressed: () {
                 setState(() {
                   // @TODO, mac address need to be configurable
-                  connect(getMacAddress(2));
+                  connect(getMacAddress(1));
                   // connect("C1:74:71:F3:94:E0");
                   Timer.periodic(Duration(seconds: 2), (timer) async {
                     List<String>? data = await _repository.getSensorData();
@@ -58,7 +58,7 @@ class _HomePageState extends State<HomePage> {
                 ],
               ),
             ),
-            Text(sensorData, style: TextStyle(fontSize: 20))
+            Text(sensorData, style: TextStyle(fontSize: 20)),
           ],
         ),
       ),
