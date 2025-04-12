@@ -18,20 +18,20 @@ class NavBarState extends State<NavBar> {
   int currentPage = 0;
 
   @override
-  Widget build(BuildContext contex) => Scaffold(
-    body: pages[currentPage],
+  Widget build(BuildContext context) => Scaffold(
+    body: IndexedStack(index: currentPage, children: pages),
     bottomNavigationBar: BottomNavigationBar(
       currentIndex: currentPage,
-      onTap: (value) {
+      onTap: (index) {
         setState(() {
-          currentPage = value;
+          currentPage = index;
         });
       },
-      items: [
+      items: const [
         BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
         BottomNavigationBarItem(
           icon: Icon(Icons.bluetooth),
-          label: 'Connetc to device',
+          label: 'Connect to device',
         ),
       ],
     ),
