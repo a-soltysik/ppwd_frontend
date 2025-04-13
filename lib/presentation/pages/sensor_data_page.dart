@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-class GraphsPage extends StatelessWidget {
-  const GraphsPage({super.key});
+class SensorDataPage extends StatelessWidget {
+  const SensorDataPage({super.key});
 
   @override
   Widget build(BuildContext context) {
