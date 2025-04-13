@@ -61,7 +61,7 @@ class _BoardConnectionPageState extends State<BoardConnectionPage>
     _connectionManager.setConnecting(false);
     _connectionManager.setConnectionStatus("Connected to $macAddress");
     _connectionManager.setConnectedDevice(macAddress);
-    _connectionManager.setBattery("$batteryLevel%");
+    _connectionManager.setBattery(_formatBatteryLevel(batteryLevel));
 
     _startDataCollection(macAddress);
   }
@@ -73,7 +73,7 @@ class _BoardConnectionPageState extends State<BoardConnectionPage>
     _connectionManager.setConnected(false);
     _connectionManager.setConnecting(false);
     _connectionManager.setConnectionStatus("Device disconnected: $reason");
-    _connectionManager.setBattery("N/A");
+    _connectionManager.setBattery(_formatBatteryLevel(-1));
     _connectionManager.setActiveSensors([]);
   }
 
@@ -127,7 +127,7 @@ class _BoardConnectionPageState extends State<BoardConnectionPage>
                 batteryLevel,
               ) {
                 _connectionManager.setBattery(
-                  batteryLevel >= 0 ? "$batteryLevel%" : "N/A",
+                  _formatBatteryLevel(batteryLevel),
                 );
               });
             },
@@ -154,7 +154,7 @@ class _BoardConnectionPageState extends State<BoardConnectionPage>
     _connectionManager.setConnected(false);
     _connectionManager.setConnecting(false);
     _connectionManager.setConnectionStatus("Disconnected");
-    _connectionManager.setBattery("N/A");
+    _connectionManager.setBattery(_formatBatteryLevel(-1));
     _connectionManager.setActiveSensors([]);
   }
 
@@ -299,6 +299,10 @@ class _BoardConnectionPageState extends State<BoardConnectionPage>
         ),
       ),
     );
+  }
+
+  String _formatBatteryLevel(int level) {
+    return level < 0 ? "N/A" : "$level%";
   }
 
   @override
