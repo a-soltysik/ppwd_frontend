@@ -3,7 +3,7 @@ String getApiUrl() {
 }
 
 String getApiKey() {
-  return 'apikey'; //@TODO Replace with actual api
+  return 'T5as2#L0';
 }
 
 String formatBatteryLevel(int level) {
