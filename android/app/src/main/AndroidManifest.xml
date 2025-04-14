@@ -10,8 +10,8 @@
 
     <application
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher"
-        android:label="ppwd_frontend">
+        android:icon="@mipmap/launcher_icon"
+        android:label="ppwd">
 
         <service android:name="com.mbientlab.metawear.android.BtleService" />
         <activity
