@@ -64,7 +64,7 @@ public class SensorSetupManager {
             var ambientLight = board.getModule(AmbientLightLtr329.class);
             if (ambientLight != null) {
                 ambientLight.illuminance().addRouteAsync(source -> source.stream((data, env) -> {
-                    measurementHandler.performMeasurement(MeasurementType.ILLUMINANCE, float.class, data);
+                    measurementHandler.performMeasurement(MeasurementType.ILLUMINANCE, Float.class, data);
                 })).continueWith(task -> {
                     pendingSensorSetups.decrementAndGet();
                     if (task.isFaulted()) {
@@ -95,7 +95,7 @@ public class SensorSetupManager {
                 final AtomicInteger barometerRoutes = new AtomicInteger(2);
 
                 barometerBosch.altitude().addRouteAsync(source -> source.stream((data, env) -> {
-                    measurementHandler.performMeasurement(MeasurementType.ALTITUDE, float.class, data);
+                    measurementHandler.performMeasurement(MeasurementType.ALTITUDE, Float.class, data);
                 })).continueWith(task -> {
                     if (task.isFaulted()) {
                         Log.e(TAG, "Error setting up altitude route", task.getError());
@@ -117,7 +117,7 @@ public class SensorSetupManager {
                 });
 
                 barometerBosch.pressure().addRouteAsync(source -> source.stream((data, env) -> {
-                    measurementHandler.performMeasurement(MeasurementType.PRESSURE, float.class, data);
+                    measurementHandler.performMeasurement(MeasurementType.PRESSURE, Float.class, data);
                 })).continueWith(task -> {
                     if (task.isFaulted()) {
                         Log.e(TAG, "Error setting up pressure route", task.getError());
@@ -210,7 +210,7 @@ public class SensorSetupManager {
             var humidity = board.getModule(HumidityBme280.class);
             if (humidity != null) {
                 humidity.value().addRouteAsync(source -> source.stream((data, env) -> {
-                    measurementHandler.performMeasurement(MeasurementType.HUMIDITY, float.class, data);
+                    measurementHandler.performMeasurement(MeasurementType.HUMIDITY, Float.class, data);
                 })).continueWith(task -> {
                     pendingSensorSetups.decrementAndGet();
                     if (task.isFaulted()) {
