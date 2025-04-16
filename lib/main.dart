@@ -1,12 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:ppwd_frontend/core/utils/app_lifecycle_observer.dart';
+import 'package:ppwd_frontend/data/services/background_service.dart';
 import 'package:ppwd_frontend/presentation/widgets/app_navigation_bar.dart';
 
-void main() {
-  WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
-  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
-  runApp(MyApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: WidgetsBinding.instance);
+
+  // Add lifecycle observer (optional: used for conditional notification logic)
+  WidgetsBinding.instance.addObserver(AppLifecycleObserver());
+
+  // Start the background service.
+  await initializeBackgroundService();
+
+  runApp(const MyApp());
 }
 
 class MyApp extends StatefulWidget {
@@ -21,13 +30,18 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
     FlutterNativeSplash.remove();
-    _requestBluetoothConnectPermission();
+    _requestPermissions();
   }
 
-  Future<void> _requestBluetoothConnectPermission() async {
+  Future<void> _requestPermissions() async {
     final status = await Permission.bluetoothConnect.request();
-
     if (status.isDenied || status.isPermanentlyDenied) {
+      await openAppSettings();
+    }
+
+    // Request notification permission (needed for Android 13+)
+    var notificationStatus = await Permission.notification.request();
+    if (notificationStatus.isDenied || notificationStatus.isPermanentlyDenied) {
       await openAppSettings();
     }
   }
@@ -38,7 +52,7 @@ class _MyAppState extends State<MyApp> {
       title: 'Flutter Java',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(primaryColor: Colors.orange),
-      home: AppNavigationBar(),
+      home: const AppNavigationBar(),
     );
   }
 }

@@ -3,6 +3,7 @@ import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:ppwd_frontend/data/repositories/board_repository.dart';
+import 'package:ppwd_frontend/data/services/background_service.dart';
 
 import '../../core/models/board.dart';
 import '../../core/utils/mac_address_utils.dart';
@@ -56,6 +57,8 @@ class _BoardConnectionPageState extends State<BoardConnectionPage>
     int batteryLevel,
     List<String> activeSensors,
   ) {
+    backgroundConnectedMac = macAddress;
+
     _connectionManager.setActiveSensors(activeSensors);
     _connectionManager.setConnected(true);
     _connectionManager.setConnecting(false);
@@ -69,6 +72,8 @@ class _BoardConnectionPageState extends State<BoardConnectionPage>
   void _handleDisconnection(String reason) {
     _dataTimer?.cancel();
     _dataTimer = null;
+
+    backgroundConnectedMac = '';
 
     _connectionManager.setConnected(false);
     _connectionManager.setConnecting(false);
