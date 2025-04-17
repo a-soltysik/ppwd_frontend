@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:developer';
 
 import 'package:flutter/material.dart';
+import 'package:ppwd_frontend/core/utils/scan_for_available_devices.dart';
 import 'package:ppwd_frontend/data/repositories/board_repository.dart';
 
 import '../../core/models/board.dart';
@@ -225,6 +226,13 @@ class _BoardConnectionPageState extends State<BoardConnectionPage>
 
               const SizedBox(height: 24),
 
+              BluetoothDeviceSelector(
+                onDeviceSelected: (macAddress) {
+                  _controller.text = macAddress;
+                  connect(macAddress); // optional auto-connect
+                },
+              ),
+              const SizedBox(height: 24),
               Form(
                 key: _formKey,
                 child: MacAddressTextField(

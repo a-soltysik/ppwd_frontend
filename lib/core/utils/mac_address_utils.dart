@@ -168,7 +168,7 @@ class _MacAddressTextFieldState extends State<MacAddressTextField> {
                       _macSuggestions.map((mac) {
                         return Dismissible(
                           key: Key(mac),
-                          direction: DismissDirection.endToStart,
+                          direction: DismissDirection.horizontal,
                           background: Container(
                             color: Colors.red,
                             alignment: Alignment.centerRight,

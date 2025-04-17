@@ -47,6 +47,9 @@ dependencies:
 
   #saving entered mac adress
   shared_preferences: ^2.2.2
+  # scaning for avaiable devices
+  get: ^4.7.2
+  flutter_blue_plus: ^1.34.5
 
 dev_dependencies:
   flutter_test:
