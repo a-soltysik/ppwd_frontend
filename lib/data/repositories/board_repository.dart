@@ -3,6 +3,7 @@ import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:optional/optional.dart';
 
 import '../../core/models/measurement.dart';
@@ -55,6 +56,10 @@ class BoardRepository {
             log(
               'Connection successful to $macAddress with ${activeSensors.length} active sensors',
             );
+
+            // Update mac for background purpose
+            final service = FlutterBackgroundService();
+            service.invoke('updateMac', {"mac": macAddress});
 
             _onConnectionSuccessCallback!(
               macAddress,
@@ -135,7 +140,7 @@ class BoardRepository {
   Future<Optional<T>> onSuccess<T>(
     String methodName,
     Future<T?> Function() operation,
-    BuildContext context,
+    BuildContext? context,
   ) async {
     try {
       return Optional.ofNullable(await operation());
@@ -150,7 +155,7 @@ class BoardRepository {
         errorMessage = 'Invalid MAC address format.';
       }
 
-      if (context.mounted) {
+      if (context != null && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: $errorMessage'),
@@ -163,7 +168,7 @@ class BoardRepository {
     } on MissingPluginException {
       log("Method $methodName is not implemented!");
 
-      if (context.mounted) {
+      if (context != null && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Method $methodName is not implemented!'),
@@ -176,7 +181,7 @@ class BoardRepository {
     } catch (e) {
       log("Unexpected error: $e");
 
-      if (context.mounted) {
+      if (context != null && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Unexpected error: $e'),
@@ -214,7 +219,7 @@ class BoardRepository {
   }
 
   Future<Optional<Map<String, List<Measurement>>>> getModuleData(
-    BuildContext context,
+    BuildContext? context,
   ) async {
     return onSuccess(_getModuleDataFunction, () async {
       final Map<Object?, Object?> rawData = await _channel.invokeMethod(
@@ -235,7 +240,7 @@ class BoardRepository {
     }, context);
   }
 
-  Future<Optional<int>> getBatteryLevel(BuildContext context) async {
+  Future<Optional<int>> getBatteryLevel(BuildContext? context) async {
     return onSuccess(_getBatteryLevelFunction, () async {
       return await _channel.invokeMethod(_getBatteryLevelFunction);
     }, context);
