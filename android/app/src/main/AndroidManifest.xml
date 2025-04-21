@@ -1,35 +1,44 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          xmlns:tools="http://schemas.android.com/tools"
+    package="com.example.ppwd_frontend">
+    
     <!-- Required permissions -->
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
+
     <!-- For Android 13+ -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
-        android:name=".MyApplication"
+        android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon"
-        android:label="ppwd">
+        android:label="ppwd"
+        android:allowBackup="false"
+        android:supportsRtl="true">
         
         <!-- Background service declaration: -->
-        <service
+       <service
             android:name="id.flutter.flutter_background_service.BackgroundService"
-            android:foregroundServiceType="connectedDevice"
-            android:stopWithTask="false" />
-        
+            android:exported="true"
+            android:foregroundServiceType="connectedDevice|location"
+            tools:replace="android:exported,android:foregroundServiceType" />
+
         <service android:name="com.mbientlab.metawear.android.BtleService" />
 
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
-            android:enableOnBackInvokedCallback="true"
             android:exported="true"
-            android:hardwareAccelerated="true"
             android:launchMode="singleTop"
-            android:taskAffinity=""
             android:theme="@style/LaunchTheme"
             android:windowSoftInputMode="adjustResize">
             <meta-data
