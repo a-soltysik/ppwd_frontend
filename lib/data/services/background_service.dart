@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'dart:developer';
 import 'dart:ui';
+import 'package:flutter/services.dart';
 import 'package:ppwd_frontend/bg_service.dart' as bg;
 import 'package:flutter_background_service_platform_interface/flutter_background_service_platform_interface.dart';
 import 'package:flutter_background_service_android/flutter_background_service_android.dart';
@@ -34,7 +35,8 @@ Future<void> initializeBackgroundService() async {
 
 @pragma('vm:entry-point')
 void _onStart(ServiceInstance service) {
-  DartPluginRegistrant.ensureInitialized();
+  // DartPluginRegistrant.ensureInitialized();
+  final boardChan = MethodChannel('flutter.native/board');
 
   String backgroundConnectedMac = "";
 
@@ -51,6 +53,7 @@ void _onStart(ServiceInstance service) {
   service.on('updateMac').listen((event) {
     final m = event?['mac'] as String?;
     if (m != null) backgroundConnectedMac = m;
+    boardChan.invokeMethod('connectToBoard', {'macAddress': m});
   });
 
   final repo = BoardRepository();
