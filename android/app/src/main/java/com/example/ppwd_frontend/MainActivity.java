@@ -10,6 +10,11 @@ import io.flutter.embedding.android.FlutterActivity;
 import io.flutter.embedding.engine.FlutterEngine;
 import io.flutter.plugin.common.MethodChannel;
 
+import com.example.board_plugin.BluetoothConnectionManager;
+import com.example.board_plugin.MethodChannelHandler;
+import com.example.board_plugin.SensorSetupManager;
+
+
 public class MainActivity extends FlutterActivity implements BluetoothConnectionManager.ConnectionCallback {
     private static final String TAG = "MainActivity";
     private static final String CHANNEL = "flutter.native/board";
