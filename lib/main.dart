@@ -83,3 +83,8 @@ class _MyAppState extends State<MyApp> {
     );
   }
 }
+
+void callbackDispatcher() {
+  WidgetsFlutterBinding.ensureInitialized();
+  print("Our background job ran!");
+}

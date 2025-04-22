@@ -3,7 +3,7 @@ import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_background_service/flutter_background_service.dart';
+import 'package:ppwd_frontend/bg_service.dart';
 import 'package:optional/optional.dart';
 
 import '../../core/models/measurement.dart';

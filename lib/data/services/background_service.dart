@@ -1,6 +1,11 @@
+// ignore_for_file: depend_on_referenced_packages
+
 import 'dart:async';
 import 'dart:developer';
-import 'package:flutter_background_service/flutter_background_service.dart';
+import 'dart:ui';
+import 'package:ppwd_frontend/bg_service.dart' as bg;
+import 'package:flutter_background_service_platform_interface/flutter_background_service_platform_interface.dart';
+import 'package:flutter_background_service_android/flutter_background_service_android.dart';
 import 'package:ppwd_frontend/data/repositories/board_repository.dart';
 import 'package:ppwd_frontend/data/services/board_service.dart';
 import 'package:ppwd_frontend/data/services/notification_service.dart';
@@ -8,7 +13,7 @@ import 'package:ppwd_frontend/core/models/board.dart';
 
 @pragma('vm:entry-point')
 Future<void> initializeBackgroundService() async {
-  final service = FlutterBackgroundService();
+  final service = bg.FlutterBackgroundService();
   await service.configure(
     androidConfiguration: AndroidConfiguration(
       onStart: _onStart,
@@ -24,11 +29,13 @@ Future<void> initializeBackgroundService() async {
       onBackground: _onIosBg,
     ),
   );
-  service.startService();
+  service.start();
 }
 
 @pragma('vm:entry-point')
 void _onStart(ServiceInstance service) {
+  DartPluginRegistrant.ensureInitialized();
+
   String backgroundConnectedMac = "";
 
   log('BgService: started');
@@ -37,8 +44,8 @@ void _onStart(ServiceInstance service) {
       title: 'Monitor Active',
       content: 'Collecting data every minute',
     );
-    // NotificationService().showStopServiceNotification();
   }
+  // NotificationService().showStopServiceNotification();
 
   // Listen for “updateMac” events from the UI
   service.on('updateMac').listen((event) {

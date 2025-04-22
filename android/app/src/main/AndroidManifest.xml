@@ -26,11 +26,18 @@
         android:supportsRtl="true">
         
         <!-- Background service declaration: -->
-       <service
+        <service
+            android:name="id.flutter.flutter_background_service.BackgroundService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice|dataSync|location"
+            tools:node="merge"
+            tools:replace="android:exported,android:foregroundServiceType" />
+       <!-- <service
             android:name="id.flutter.flutter_background_service.BackgroundService"
             android:exported="true"
             android:foregroundServiceType="connectedDevice|location"
-            tools:replace="android:exported,android:foregroundServiceType" />
+            tools:replace="android:exported,android:foregroundServiceType" /> -->
 
         <service android:name="com.mbientlab.metawear.android.BtleService" />
 
