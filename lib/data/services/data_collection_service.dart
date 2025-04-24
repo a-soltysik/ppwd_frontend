@@ -21,7 +21,7 @@ class DataCollectionService {
   final BoardService _boardService = BoardService();
 
   void startDataCollection(
-    BuildContext context,
+    BuildContext? context,
     BoardRepository repository,
     String macAddress,
     Function(int) onBatteryUpdated,
@@ -46,7 +46,7 @@ class DataCollectionService {
   }
 
   Future<void> collectAndSendData(
-    BuildContext context,
+    BuildContext? context,
     BoardRepository repository,
     String macAddress,
     Function(int) onBatteryUpdated,

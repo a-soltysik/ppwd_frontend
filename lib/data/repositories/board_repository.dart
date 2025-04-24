@@ -3,7 +3,8 @@ import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:ppwd_frontend/bg_service.dart';
+import 'package:flutter_background_service_android/flutter_background_service_android.dart'
+    as bg;
 import 'package:optional/optional.dart';
 
 import '../../core/models/measurement.dart';
@@ -33,7 +34,7 @@ class BoardRepository {
   DisconnectionCallback? _onDisconnectionCallback;
 
   void setupConnectionHandlers(
-    BuildContext context, {
+    BuildContext? context, {
     required ConnectionSuccessCallback onConnected,
     required DisconnectionCallback onDisconnected,
   }) {
@@ -58,7 +59,7 @@ class BoardRepository {
             );
 
             // Update mac for background purpose
-            final service = FlutterBackgroundService();
+            final service = bg.FlutterBackgroundServiceAndroid();
             service.invoke('updateMac', {"mac": macAddress});
 
             _onConnectionSuccessCallback!(
@@ -72,7 +73,7 @@ class BoardRepository {
           final reason = call.arguments as String? ?? 'Unknown reason';
           log('Device disconnected: $reason');
 
-          if (context.mounted) {
+          if (context != null && context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text('Device disconnected: $reason'),
@@ -195,14 +196,14 @@ class BoardRepository {
   }
 
   Future<Optional<bool>> connectToDevice(
-    BuildContext context,
+    BuildContext? context,
     String mac,
   ) async {
-    showLoading(context, 'Connecting to device...');
+    if (context != null) showLoading(context, 'Connecting to device...');
     var result = await onSuccess(_connectToBoardFunction, () async {
       await _channel.invokeMethod(_connectToBoardFunction, {'macAddress': mac});
 
-      if (context.mounted) {
+      if (context != null && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Attempting to connect to $mac'),
@@ -214,7 +215,7 @@ class BoardRepository {
       return true;
     }, context);
 
-    hideLoading(context);
+    if (context != null) hideLoading(context);
     return result;
   }
 
