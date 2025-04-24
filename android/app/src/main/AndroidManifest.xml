@@ -2,7 +2,6 @@
           xmlns:tools="http://schemas.android.com/tools"
     package="com.example.ppwd_frontend">
     
-    <!-- Required permissions -->
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
@@ -15,7 +14,6 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
 
-    <!-- For Android 13+ -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
@@ -25,7 +23,6 @@
         android:allowBackup="false"
         android:supportsRtl="true">
         
-        <!-- Background service declaration: -->
         <service
             android:name="id.flutter.flutter_background_service.BackgroundService"
             android:enabled="true"
@@ -33,11 +30,6 @@
             android:foregroundServiceType="connectedDevice|dataSync|location"
             tools:node="merge"
             tools:replace="android:exported,android:foregroundServiceType" />
-       <!-- <service
-            android:name="id.flutter.flutter_background_service.BackgroundService"
-            android:exported="true"
-            android:foregroundServiceType="connectedDevice|location"
-            tools:replace="android:exported,android:foregroundServiceType" /> -->
 
         <service android:name="com.mbientlab.metawear.android.BtleService" />
 

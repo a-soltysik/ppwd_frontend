@@ -1,4 +1,4 @@
-package com.example.board_plugin;              // <- note the package
+package com.example.board_plugin;        
 
 import android.content.Context;
 import androidx.annotation.NonNull;

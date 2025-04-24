@@ -1,7 +1,8 @@
 import 'dart:developer';
+import 'package:flutter_background_service_android/flutter_background_service_android.dart'
+    as bg;
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:ppwd_frontend/bg_service.dart';
 
 class NotificationService {
   static final _instance = NotificationService._();
@@ -21,7 +22,7 @@ class NotificationService {
       initSettings,
       onDidReceiveNotificationResponse: (resp) async {
         if (resp.actionId == 'stop_service') {
-          FlutterBackgroundService().invoke('stopService');
+          bg.FlutterBackgroundServiceAndroid().invoke('stopService');
         }
       },
     );

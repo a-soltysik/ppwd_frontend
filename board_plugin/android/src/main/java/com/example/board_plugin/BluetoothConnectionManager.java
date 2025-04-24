@@ -38,7 +38,7 @@ public class BluetoothConnectionManager implements ServiceConnection {
     private ConnectionCallback connectionCallback;
 
     public BluetoothConnectionManager(Context context, SensorSetupManager setupManager) {
-        this.context = context;
+        this.context = context.getApplicationContext();
         this.setupManager = setupManager;
         this.mainHandler = new Handler(Looper.getMainLooper());
     }

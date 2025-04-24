@@ -1,20 +1,18 @@
-// ignore_for_file: depend_on_referenced_packages
-
 import 'dart:async';
 import 'dart:developer';
 import 'dart:ui';
 import 'package:flutter/services.dart';
-import 'package:ppwd_frontend/bg_service.dart' as bg;
+import 'package:flutter/widgets.dart';
+import 'package:flutter_background_service_android/flutter_background_service_android.dart'
+    as bg;
 import 'package:flutter_background_service_platform_interface/flutter_background_service_platform_interface.dart';
-import 'package:flutter_background_service_android/flutter_background_service_android.dart';
 import 'package:ppwd_frontend/data/repositories/board_repository.dart';
-import 'package:ppwd_frontend/data/services/board_service.dart';
 import 'package:ppwd_frontend/data/services/notification_service.dart';
-import 'package:ppwd_frontend/core/models/board.dart';
+import 'package:ppwd_frontend/data/services/data_collection_service.dart';
 
 @pragma('vm:entry-point')
 Future<void> initializeBackgroundService() async {
-  final service = bg.FlutterBackgroundService();
+  final service = bg.FlutterBackgroundServiceAndroid();
   await service.configure(
     androidConfiguration: AndroidConfiguration(
       onStart: _onStart,
@@ -22,7 +20,7 @@ Future<void> initializeBackgroundService() async {
       isForegroundMode: true,
       notificationChannelId: 'device_monitor_channel',
       initialNotificationTitle: 'Device Monitor',
-      initialNotificationContent: 'Monitoring sensors and battery',
+      initialNotificationContent: 'Waiting for board…',
     ),
     iosConfiguration: IosConfiguration(
       autoStart: true,
@@ -34,59 +32,60 @@ Future<void> initializeBackgroundService() async {
 }
 
 @pragma('vm:entry-point')
-void _onStart(ServiceInstance service) {
-  // DartPluginRegistrant.ensureInitialized();
-  final boardChan = MethodChannel('flutter.native/board');
-
-  String backgroundConnectedMac = "";
-
-  log('BgService: started');
-  if (service is AndroidServiceInstance) {
-    service.setForegroundNotificationInfo(
-      title: 'Monitor Active',
-      content: 'Collecting data every minute',
-    );
-  }
-  // NotificationService().showStopServiceNotification();
-
-  // Listen for “updateMac” events from the UI
-  service.on('updateMac').listen((event) {
-    final m = event?['mac'] as String?;
-    if (m != null) backgroundConnectedMac = m;
-    boardChan.invokeMethod('connectToBoard', {'macAddress': m});
-  });
+Future<void> _onStart(ServiceInstance service) async {
+  WidgetsFlutterBinding.ensureInitialized();
+  DartPluginRegistrant.ensureInitialized();
 
   final repo = BoardRepository();
-  final backend = BoardService();
+  final dataSvc = DataCollectionService();
 
-  Timer.periodic(const Duration(minutes: 1), (_) async {
-    log('Periodic timer tick: collecting data');
-    final mac = backgroundConnectedMac;
-    log('Mac address: $mac');
-    if (mac.isEmpty) return;
+  String mac = '';
+  bool lowBattNotified = false;
+
+  log('BgService: started');
+
+  if (service is bg.AndroidServiceInstance) {
+    service.setForegroundNotificationInfo(
+      title: 'Device Monitor',
+      content: 'Waiting for board…',
+    );
+  }
+
+  service.on('updateMac').listen((event) async {
+    final m = event?['mac'] as String?;
+    if (m == null || m.isEmpty) return;
+    mac = m;
+    log('BgService: updateMac → $mac');
+
+    if (service is bg.AndroidServiceInstance) {
+      service.setForegroundNotificationInfo(
+        title: 'Monitoring $mac',
+        content: 'Collecting data every minute',
+      );
+    }
 
     try {
-      final dataOpt = await repo.getModuleData(null);
-      log('Data opt: $dataOpt');
-      dataOpt.filter((list) => list.isNotEmpty).ifPresent((measurements) async {
-        log('Measurements: $measurements');
-        final success = await backend.sendSensorData(Board(mac, measurements));
-        log('Data sent to backend: $success');
-        (await repo.getBatteryLevel(null)).ifPresent((batt) {
-          if (batt < 20) {
-            log('Battery low threshold reached, showing notification');
-            NotificationService().showBatteryLowNotification(batt);
-          }
-        });
-      });
-    } catch (e, st) {
-      log('Error in data collection cycle: $e', error: e, stackTrace: st);
+      await repo.connectToDevice(null, mac);
+
+      log('BgService: connectToBoard() invoked');
+    } on PlatformException catch (e) {
+      log('BgService: connect error: ${e.code}/${e.message}');
+      return;
     }
+
+    dataSvc.startDataCollection(null, repo, mac, (batteryLevel) {
+      if (batteryLevel < 20) {
+        log(batteryLevel.toString());
+        if (batteryLevel < 20 && !lowBattNotified) {
+          lowBattNotified = true;
+          NotificationService().showBatteryLowNotification(batteryLevel);
+        } else if (batteryLevel >= 20) {
+          lowBattNotified = false;
+        }
+      }
+    });
   });
 }
 
 @pragma('vm:entry-point')
-bool _onIosBg(ServiceInstance service) {
-  // DartPluginRegistrant.ensureInitialized();
-  return true;
-}
+bool _onIosBg(ServiceInstance service) => true;
