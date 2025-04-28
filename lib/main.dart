@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:ppwd_frontend/data/services/background_service.dart';
@@ -13,28 +12,12 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: WidgetsBinding.instance);
 
-  final fln = FlutterLocalNotificationsPlugin();
-  const androidInit = AndroidInitializationSettings('@mipmap/launcher_icon');
-  await fln.initialize(const InitializationSettings(android: androidInit));
+  await requestPermissions();
 
-  await fln
-      .resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin
-      >()
-      ?.createNotificationChannel(
-        const AndroidNotificationChannel(
-          _fgChannelId,
-          _fgChannelName,
-          importance: Importance.high,
-        ),
-      );
-
-  await NotificationService().init();
-
-  await Permission.location.request();
-  if (!await Permission.location.isGranted) {
-    await openAppSettings();
-  }
+  await NotificationService().setupFlutterNotifications(
+    channelId: _fgChannelId,
+    channelName: _fgChannelName,
+  );
 
   await initializeBackgroundService();
 
@@ -53,24 +36,6 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
     FlutterNativeSplash.remove();
-    _requestPermissions();
-  }
-
-  Future<void> _requestPermissions() async {
-    final status = await Permission.bluetoothConnect.request();
-    if (status.isDenied || status.isPermanentlyDenied) {
-      await openAppSettings();
-    }
-
-    final bluetoothStatus = await Permission.bluetoothScan.request();
-    if (bluetoothStatus.isDenied || bluetoothStatus.isPermanentlyDenied) {
-      await openAppSettings();
-    }
-
-    var notificationStatus = await Permission.notification.request();
-    if (notificationStatus.isDenied || notificationStatus.isPermanentlyDenied) {
-      await openAppSettings();
-    }
   }
 
   @override
@@ -81,5 +46,27 @@ class _MyAppState extends State<MyApp> {
       theme: ThemeData(primaryColor: Colors.orange),
       home: const AppNavigationBar(),
     );
+  }
+}
+
+Future<void> requestPermissions() async {
+  final status = await Permission.bluetoothConnect.request();
+  if (status.isDenied || status.isPermanentlyDenied) {
+    await openAppSettings();
+  }
+
+  final bluetoothStatus = await Permission.bluetoothScan.request();
+  if (bluetoothStatus.isDenied || bluetoothStatus.isPermanentlyDenied) {
+    await openAppSettings();
+  }
+
+  var notificationStatus = await Permission.notification.request();
+  if (notificationStatus.isDenied || notificationStatus.isPermanentlyDenied) {
+    await openAppSettings();
+  }
+
+  var locationStatus = await Permission.location.request();
+  if (locationStatus.isDenied || locationStatus.isPermanentlyDenied) {
+    await openAppSettings();
   }
 }
