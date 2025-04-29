@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_background_service_android/flutter_background_service_android.dart'
     as bg;
 import 'package:optional/optional.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/models/measurement.dart';
 
@@ -27,11 +28,18 @@ class BoardRepository {
   static const _onConnectionSuccess = 'onConnectionSuccess';
 
   static const _loadingTimeout = Duration(seconds: 30);
+  static const String PREFS_MAC_ADDRESS = "last_connected_mac";
+  static const String PREFS_CONNECTION_ACTIVE = "connection_active";
 
   bool isLoading = false;
   Timer? _loadingTimer;
   ConnectionSuccessCallback? _onConnectionSuccessCallback;
   DisconnectionCallback? _onDisconnectionCallback;
+
+  // Track connection state
+  bool _isConnected = false;
+
+  bool get isConnected => _isConnected;
 
   void setupConnectionHandlers(
     BuildContext? context, {
@@ -58,6 +66,9 @@ class BoardRepository {
               'Connection successful to $macAddress with ${activeSensors.length} active sensors',
             );
 
+            _isConnected = true;
+            _saveConnectionInfo(macAddress, true);
+
             // Update mac for background purpose
             final service = bg.FlutterBackgroundServiceAndroid();
             service.invoke('updateMac', {"mac": macAddress});
@@ -72,6 +83,9 @@ class BoardRepository {
         case _handleBoardDisconnection:
           final reason = call.arguments as String? ?? 'Unknown reason';
           log('Device disconnected: $reason');
+
+          _isConnected = false;
+          _saveConnectionInfo(null, false);
 
           if (context != null && context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -89,6 +103,18 @@ class BoardRepository {
       }
       return null;
     });
+  }
+
+  Future<void> _saveConnectionInfo(String? macAddress, bool isActive) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (macAddress != null) {
+        await prefs.setString(PREFS_MAC_ADDRESS, macAddress);
+      }
+      await prefs.setBool(PREFS_CONNECTION_ACTIVE, isActive);
+    } catch (e) {
+      log('Error saving connection info: $e');
+    }
   }
 
   void showLoading(BuildContext context, [String message = 'Loading...']) {
@@ -247,11 +273,18 @@ class BoardRepository {
     }, context);
   }
 
-  Future<void> disconnectFromDevice(BuildContext context) async {
+  Future<void> disconnectFromDevice(BuildContext? context) async {
     try {
       await _channel.invokeMethod(_disconnectFromBoardFunction);
 
-      if (context.mounted) {
+      _isConnected = false;
+
+      final service = bg.FlutterBackgroundServiceAndroid();
+      service.invoke('disconnect', {});
+
+      _saveConnectionInfo(null, false);
+
+      if (context != null && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Disconnected from device'),
@@ -262,7 +295,7 @@ class BoardRepository {
     } catch (e) {
       log("Error disconnecting: $e");
 
-      if (context.mounted) {
+      if (context != null && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error disconnecting: $e'),
