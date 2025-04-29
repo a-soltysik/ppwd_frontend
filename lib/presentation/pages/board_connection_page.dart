@@ -2,7 +2,10 @@ import 'dart:async';
 import 'dart:developer';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_background_service_android/flutter_background_service_android.dart'
+    as bg;
 import 'package:ppwd_frontend/data/repositories/board_repository.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/models/board.dart';
 import '../../core/utils/mac_address_utils.dart';
@@ -25,6 +28,8 @@ class _BoardConnectionPageState extends State<BoardConnectionPage>
   final _connectionManager = ConnectionStateManager();
 
   Timer? _dataTimer;
+  static const String PREFS_MAC_ADDRESS = "last_connected_mac";
+  static const String PREFS_CONNECTION_ACTIVE = "connection_active";
 
   @override
   void initState() {
@@ -32,15 +37,27 @@ class _BoardConnectionPageState extends State<BoardConnectionPage>
 
     _connectionManager.addListener(_updateUI);
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       _repository.setupConnectionHandlers(
         context,
         onConnected: _handleConnectionSuccess,
         onDisconnected: _handleDisconnection,
       );
 
-      if (_connectionManager.isConnected && _dataTimer == null) {
-        _startDataCollection(_connectionManager.connectedDevice);
+      // Try to restore the last connected MAC address
+      final prefs = await SharedPreferences.getInstance();
+      final lastMac = prefs.getString(PREFS_MAC_ADDRESS);
+      final isActive = prefs.getBool(PREFS_CONNECTION_ACTIVE) ?? false;
+
+      if (lastMac != null && isActive) {
+        log('Restoring last connection to: $lastMac');
+        _controller.text = lastMac;
+
+        // Update UI to show we're attempting to connect
+        _connectionManager.setConnectionStatus(
+          "Restoring connection to $lastMac...",
+        );
+        _connectionManager.setConnecting(true);
       }
     });
   }
@@ -64,6 +81,10 @@ class _BoardConnectionPageState extends State<BoardConnectionPage>
     _connectionManager.setBattery(_formatBatteryLevel(batteryLevel));
 
     _startDataCollection(macAddress);
+
+    // Ensure the background service knows about this connection
+    final service = bg.FlutterBackgroundServiceAndroid();
+    service.invoke('updateMac', {"mac": macAddress});
   }
 
   void _handleDisconnection(String reason) {
@@ -156,6 +177,10 @@ class _BoardConnectionPageState extends State<BoardConnectionPage>
     _connectionManager.setConnectionStatus("Disconnected");
     _connectionManager.setBattery(_formatBatteryLevel(-1));
     _connectionManager.setActiveSensors([]);
+
+    // Notify background service of disconnection
+    final service = bg.FlutterBackgroundServiceAndroid();
+    service.invoke('disconnect', {});
   }
 
   @override
@@ -176,6 +201,46 @@ class _BoardConnectionPageState extends State<BoardConnectionPage>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Background service status
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    children: [
+                      const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.sync, color: Colors.green),
+                          SizedBox(width: 8),
+                          Text(
+                            "Background Service",
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        "Data collection will continue in the background even when app is closed.",
+                        textAlign: TextAlign.center,
+                      ),
+                      if (isConnected) ...[
+                        const SizedBox(height: 8),
+                        const Text(
+                          "You can safely close this app and data will still be collected and sent to the server.",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontStyle: FontStyle.italic),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
               // Connection status
               Card(
                 child: Padding(

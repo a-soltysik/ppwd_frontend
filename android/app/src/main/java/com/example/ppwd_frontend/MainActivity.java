@@ -4,15 +4,15 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 
+import com.example.board_plugin.BluetoothConnectionManager;
+import com.example.board_plugin.MethodChannelHandler;
+import com.example.board_plugin.SensorSetupManager;
+
 import java.util.List;
 
 import io.flutter.embedding.android.FlutterActivity;
 import io.flutter.embedding.engine.FlutterEngine;
 import io.flutter.plugin.common.MethodChannel;
-
-import com.example.board_plugin.BluetoothConnectionManager;
-import com.example.board_plugin.MethodChannelHandler;
-import com.example.board_plugin.SensorSetupManager;
 
 
 public class MainActivity extends FlutterActivity implements BluetoothConnectionManager.ConnectionCallback {
@@ -50,14 +50,5 @@ public class MainActivity extends FlutterActivity implements BluetoothConnection
         runOnUiThread(() -> {
             methodChannelHandler.notifyDisconnection(reason);
         });
-    }
-
-    @Override
-    public void onDestroy() {
-        Log.i(TAG, "Activity being destroyed");
-        if (bluetoothManager != null) {
-            bluetoothManager.disconnectFromBoard();
-        }
-        super.onDestroy();
     }
 }

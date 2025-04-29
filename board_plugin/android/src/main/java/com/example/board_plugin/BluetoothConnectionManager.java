@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class BluetoothConnectionManager implements ServiceConnection {
     private static final String TAG = "BluetoothManager";
-    private static final int MAX_CONNECTION_RETRIES = 2;
+    private static final int MAX_CONNECTION_RETRIES = 3;
     private static final long CONNECTION_RETRY_DELAY_MS = 1500;
 
     private final Context context;
@@ -36,6 +36,8 @@ public class BluetoothConnectionManager implements ServiceConnection {
     private int connectionRetries = 0;
     private boolean isServiceBound = false;
     private ConnectionCallback connectionCallback;
+
+    private boolean isShutdownRequested = false;
 
     public BluetoothConnectionManager(Context context, SensorSetupManager setupManager) {
         this.context = context.getApplicationContext();
@@ -57,6 +59,7 @@ public class BluetoothConnectionManager implements ServiceConnection {
 
     public void connectToDevice(String macAddress) {
         Log.i(TAG, "Connect to device called for: " + macAddress);
+        isShutdownRequested = false;
 
         if (isConnecting.get()) {
             Log.e(TAG, "Already attempting to connect to a device");
@@ -117,6 +120,7 @@ public class BluetoothConnectionManager implements ServiceConnection {
 
     public void disconnectFromBoard() {
         Log.i(TAG, "Disconnecting from board");
+        isShutdownRequested = true;
 
         if (setupManager.getBoard() != null) {
             try {
@@ -167,8 +171,16 @@ public class BluetoothConnectionManager implements ServiceConnection {
         isServiceBound = false;
         isConnecting.set(false);
         setupManager.clear();
-        if (connectionCallback != null) {
+
+        if (!isShutdownRequested && connectionCallback != null) {
             connectionCallback.onDisconnection("Bluetooth service disconnected");
+
+            mainHandler.postDelayed(() -> {
+                if (!isShutdownRequested && !macAddress.isEmpty()) {
+                    Log.i(TAG, "Service disconnected unexpectedly, attempting to reconnect");
+                    connectToDevice(macAddress);
+                }
+            }, 5000);
         }
     }
 
@@ -334,6 +346,13 @@ public class BluetoothConnectionManager implements ServiceConnection {
             if (settings != null) {
                 settings.battery().read();
             }
+        }
+    }
+
+    public void checkConnectionAndReconnect() {
+        if (!isConnected && !isConnecting.get() && !isShutdownRequested && !macAddress.isEmpty()) {
+            Log.i(TAG, "Connection check detected disconnection, attempting to reconnect");
+            connectToDevice(macAddress);
         }
     }
 
