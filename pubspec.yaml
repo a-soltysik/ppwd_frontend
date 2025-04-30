@@ -48,10 +48,11 @@ dependencies:
   flutter_native_splash: ^2.4.6
 
   # background service
-  # flutter_background_service: ^5.1.0
+  flutter_background_service: ^5.1.0
   flutter_background_service_android: ^6.3.0
   flutter_background_service_platform_interface: ^5.1.2
 
+  # notifications
   flutter_local_notifications: ^19.1.0
   shared_preferences: ^2.3.0  
 

@@ -14,8 +14,19 @@ import 'package:shared_preferences/shared_preferences.dart';
 // Keys for SharedPreferences
 const String PREFS_MAC_ADDRESS = "last_connected_mac";
 const String PREFS_CONNECTION_ACTIVE = "connection_active";
+const String PREFS_NOTIFICATION_STATE = "notification_state";
+
+// Global variables to track notification state
+String _lastTitle = '';
+String _lastContent = '';
+bool _serviceInitialized = false;
 
 Future<void> initializeBackgroundService() async {
+  if (_serviceInitialized) {
+    log('Background service already initialized');
+    return;
+  }
+
   final service = bg.FlutterBackgroundServiceAndroid();
 
   await service.configure(
@@ -36,6 +47,31 @@ Future<void> initializeBackgroundService() async {
   );
 
   await service.start();
+  _serviceInitialized = true;
+}
+
+void updateForegroundNotification(
+  bg.AndroidServiceInstance service, {
+  required String title,
+  required String content,
+}) {
+  if (title != _lastTitle || content != _lastContent) {
+    service.setForegroundNotificationInfo(title: title, content: content);
+
+    _lastTitle = title;
+    _lastContent = content;
+
+    _saveNotificationState(title, content);
+  }
+}
+
+Future<void> _saveNotificationState(String title, String content) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(PREFS_NOTIFICATION_STATE, '$title|$content');
+  } catch (e) {
+    log('Error saving notification state: $e');
+  }
 }
 
 @pragma('vm:entry-point')
@@ -45,26 +81,22 @@ Future<void> _onStart(ServiceInstance service) async {
 
   final repo = BoardRepository();
   final dataSvc = DataCollectionService();
-
   final SharedPreferences prefs = await SharedPreferences.getInstance();
-
-  bool lowBattNotified = false;
-  String? lastConnectedMac;
-  bool? isConnectionActive;
 
   String notificationTitle = 'Device Monitor';
   String notificationContent = 'Service running...';
 
   if (service is bg.AndroidServiceInstance) {
-    service.setForegroundNotificationInfo(
+    updateForegroundNotification(
+      service,
       title: notificationTitle,
       content: notificationContent,
     );
   }
 
   try {
-    lastConnectedMac = prefs.getString(PREFS_MAC_ADDRESS);
-    isConnectionActive = prefs.getBool(PREFS_CONNECTION_ACTIVE);
+    final lastConnectedMac = prefs.getString(PREFS_MAC_ADDRESS);
+    final isConnectionActive = prefs.getBool(PREFS_CONNECTION_ACTIVE);
 
     if (lastConnectedMac != null && isConnectionActive == true) {
       log('BgService: Restoring connection to $lastConnectedMac');
@@ -72,22 +104,16 @@ Future<void> _onStart(ServiceInstance service) async {
       if (service is bg.AndroidServiceInstance) {
         notificationTitle = 'Reconnecting';
         notificationContent = 'Trying to connect to $lastConnectedMac';
-        service.setForegroundNotificationInfo(
+
+        updateForegroundNotification(
+          service,
           title: notificationTitle,
           content: notificationContent,
         );
       }
 
       // Attempt to reconnect
-      _connectToDevice(
-        service,
-        repo,
-        dataSvc,
-        lastConnectedMac,
-        lowBattNotified,
-        notificationTitle,
-        notificationContent,
-      );
+      _connectToDevice(service, repo, dataSvc, lastConnectedMac);
     }
   } catch (e) {
     log('BgService: Error restoring connection: $e');
@@ -105,15 +131,7 @@ Future<void> _onStart(ServiceInstance service) async {
 
     log('BgService: Connection request for $macAddress');
 
-    _connectToDevice(
-      service,
-      repo,
-      dataSvc,
-      macAddress,
-      lowBattNotified,
-      notificationTitle,
-      notificationContent,
-    );
+    _connectToDevice(service, repo, dataSvc, macAddress);
   });
 
   // Listen for disconnect requests
@@ -126,7 +144,9 @@ Future<void> _onStart(ServiceInstance service) async {
     if (service is bg.AndroidServiceInstance) {
       notificationTitle = 'Device Monitor';
       notificationContent = 'Disconnected from device';
-      service.setForegroundNotificationInfo(
+
+      updateForegroundNotification(
+        service,
         title: notificationTitle,
         content: notificationContent,
       );
@@ -139,18 +159,10 @@ Future<void> _onStart(ServiceInstance service) async {
 
   // Keep this service running with regular health checks
   Timer.periodic(const Duration(minutes: 1), (_) async {
-    // Service heartbeat
-    if (service is bg.AndroidServiceInstance) {
-      service.setForegroundNotificationInfo(
-        title: notificationTitle,
-        content: notificationContent,
-      );
-    }
-
     // Check if we need to reconnect
     final SharedPreferences prefs = await SharedPreferences.getInstance();
-    lastConnectedMac = prefs.getString(PREFS_MAC_ADDRESS);
-    isConnectionActive = prefs.getBool(PREFS_CONNECTION_ACTIVE);
+    final lastConnectedMac = prefs.getString(PREFS_MAC_ADDRESS);
+    final isConnectionActive = prefs.getBool(PREFS_CONNECTION_ACTIVE);
 
     if (lastConnectedMac != null &&
         isConnectionActive == true &&
@@ -158,15 +170,19 @@ Future<void> _onStart(ServiceInstance service) async {
       log(
         'BgService: Heartbeat detected disconnection, reconnecting to $lastConnectedMac',
       );
-      _connectToDevice(
-        service,
-        repo,
-        dataSvc,
-        lastConnectedMac!,
-        lowBattNotified,
-        notificationTitle,
-        notificationContent,
-      );
+
+      if (service is bg.AndroidServiceInstance) {
+        notificationTitle = 'Reconnecting';
+        notificationContent = 'Trying to connect to $lastConnectedMac';
+
+        updateForegroundNotification(
+          service,
+          title: notificationTitle,
+          content: notificationContent,
+        );
+      }
+
+      _connectToDevice(service, repo, dataSvc, lastConnectedMac);
     }
   });
 }
@@ -176,16 +192,12 @@ Future<void> _connectToDevice(
   BoardRepository repo,
   DataCollectionService dataSvc,
   String macAddress,
-  bool lowBattNotified,
-  String notificationTitle,
-  String notificationContent,
 ) async {
   if (service is bg.AndroidServiceInstance) {
-    notificationTitle = 'Connecting to device';
-    notificationContent = 'Attempting to connect to $macAddress';
-    service.setForegroundNotificationInfo(
-      title: notificationTitle,
-      content: notificationContent,
+    updateForegroundNotification(
+      service,
+      title: 'Connecting to device',
+      content: 'Attempting to connect to $macAddress',
     );
   }
 
@@ -195,57 +207,25 @@ Future<void> _connectToDevice(
     if (!opt.isPresent || !(opt.value)) {
       log('BgService: Failed to connect to $macAddress');
 
-      if (service is bg.AndroidServiceInstance) {
-        notificationTitle = 'Connection failed';
-        notificationContent = 'Could not connect to $macAddress';
-        service.setForegroundNotificationInfo(
-          title: notificationTitle,
-          content: notificationContent,
-        );
-      }
-
       // Schedule retry
       Timer(const Duration(seconds: 30), () {
         log('BgService: Retrying connection to $macAddress');
-        _connectToDevice(
-          service,
-          repo,
-          dataSvc,
-          macAddress,
-          lowBattNotified,
-          notificationTitle,
-          notificationContent,
-        );
+        _connectToDevice(service, repo, dataSvc, macAddress);
       });
 
       return;
     }
 
-    if (service is bg.AndroidServiceInstance) {
-      notificationTitle = 'Monitoring $macAddress';
-      notificationContent = 'Collecting data in background';
-      service.setForegroundNotificationInfo(
-        title: notificationTitle,
-        content: notificationContent,
-      );
-    }
-
     // Setup data collection
     await dataSvc.startDataCollection(null, repo, macAddress, (batteryLevel) {
-      if (batteryLevel < 20 && !lowBattNotified) {
-        NotificationService().showBatteryLowNotification(batteryLevel);
-        lowBattNotified = true;
-      } else if (batteryLevel >= 20) {
-        lowBattNotified = false;
-      }
+      NotificationService().showBatteryLowNotification(batteryLevel);
 
       // Update notification with battery info
       if (service is bg.AndroidServiceInstance) {
-        notificationTitle = 'Monitoring $macAddress';
-        notificationContent = 'Battery: $batteryLevel%, collecting data';
-        service.setForegroundNotificationInfo(
-          title: notificationTitle,
-          content: notificationContent,
+        updateForegroundNotification(
+          service,
+          title: 'Monitoring $macAddress',
+          content: 'Service is running in the background',
         );
       }
     });
@@ -255,25 +235,16 @@ Future<void> _connectToDevice(
     log('BgService: Error during connection: $e');
 
     if (service is bg.AndroidServiceInstance) {
-      notificationTitle = 'Connection error';
-      notificationContent = 'Error: $e';
-      service.setForegroundNotificationInfo(
-        title: notificationTitle,
-        content: notificationContent,
+      updateForegroundNotification(
+        service,
+        title: 'Connection error',
+        content: 'Error: $e',
       );
     }
 
     // Schedule retry
     Timer(const Duration(seconds: 30), () {
-      _connectToDevice(
-        service,
-        repo,
-        dataSvc,
-        macAddress,
-        lowBattNotified,
-        notificationTitle,
-        notificationContent,
-      );
+      _connectToDevice(service, repo, dataSvc, macAddress);
     });
   }
 }
