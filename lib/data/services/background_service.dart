@@ -6,17 +6,11 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_background_service_android/flutter_background_service_android.dart'
     as bg;
 import 'package:flutter_background_service_platform_interface/flutter_background_service_platform_interface.dart';
+import 'package:ppwd_frontend/core/utils/user_shared_preference.dart';
 import 'package:ppwd_frontend/data/repositories/board_repository.dart';
 import 'package:ppwd_frontend/data/services/data_collection_service.dart';
 import 'package:ppwd_frontend/data/services/notification_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-// Keys for SharedPreferences
-const String PREFS_MAC_ADDRESS = "last_connected_mac";
-const String PREFS_CONNECTION_ACTIVE = "connection_active";
-const String PREFS_NOTIFICATION_STATE = "notification_state";
-
-// Global variables to track notification state
 String _lastTitle = '';
 String _lastContent = '';
 bool _serviceInitialized = false;
@@ -67,8 +61,7 @@ void updateForegroundNotification(
 
 Future<void> _saveNotificationState(String title, String content) async {
   try {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(PREFS_NOTIFICATION_STATE, '$title|$content');
+    await UserSimplePreferences.setNotificationState('$title|$content');
   } catch (e) {
     log('Error saving notification state: $e');
   }
@@ -81,7 +74,8 @@ Future<void> _onStart(ServiceInstance service) async {
 
   final repo = BoardRepository();
   final dataSvc = DataCollectionService();
-  final SharedPreferences prefs = await SharedPreferences.getInstance();
+
+  await UserSimplePreferences.init();
 
   String notificationTitle = 'Device Monitor';
   String notificationContent = 'Service running...';
@@ -95,8 +89,8 @@ Future<void> _onStart(ServiceInstance service) async {
   }
 
   try {
-    final lastConnectedMac = prefs.getString(PREFS_MAC_ADDRESS);
-    final isConnectionActive = prefs.getBool(PREFS_CONNECTION_ACTIVE);
+    final lastConnectedMac = UserSimplePreferences.getMacAddress();
+    final isConnectionActive = UserSimplePreferences.getConnectionActive();
 
     if (lastConnectedMac != null && isConnectionActive == true) {
       log('BgService: Restoring connection to $lastConnectedMac');
@@ -125,9 +119,8 @@ Future<void> _onStart(ServiceInstance service) async {
     if (macAddress == null || macAddress.isEmpty) return;
 
     // Store MAC address for reconnecting if the service restarts
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setString(PREFS_MAC_ADDRESS, macAddress);
-    await prefs.setBool(PREFS_CONNECTION_ACTIVE, true);
+    await UserSimplePreferences.setMacAddress(macAddress);
+    await UserSimplePreferences.setConnectionActive(true);
 
     log('BgService: Connection request for $macAddress');
 
@@ -138,8 +131,8 @@ Future<void> _onStart(ServiceInstance service) async {
   service.on('disconnect').listen((evt) async {
     log('BgService: Disconnect requested');
 
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(PREFS_CONNECTION_ACTIVE, false);
+    await UserSimplePreferences.setConnectionActive(false);
+    await UserSimplePreferences.removeMacAddress();
 
     if (service is bg.AndroidServiceInstance) {
       notificationTitle = 'Device Monitor';
@@ -160,9 +153,8 @@ Future<void> _onStart(ServiceInstance service) async {
   // Keep this service running with regular health checks
   Timer.periodic(const Duration(minutes: 1), (_) async {
     // Check if we need to reconnect
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    final lastConnectedMac = prefs.getString(PREFS_MAC_ADDRESS);
-    final isConnectionActive = prefs.getBool(PREFS_CONNECTION_ACTIVE);
+    final lastConnectedMac = UserSimplePreferences.getMacAddress();
+    final isConnectionActive = UserSimplePreferences.getConnectionActive();
 
     if (lastConnectedMac != null &&
         isConnectionActive == true &&
@@ -217,7 +209,9 @@ Future<void> _connectToDevice(
     }
 
     // Setup data collection
-    await dataSvc.startDataCollection(null, repo, macAddress, (batteryLevel) {
+    await dataSvc.startDataCollection(null, repo, macAddress, (
+      batteryLevel,
+    ) async {
       NotificationService().showBatteryLowNotification(batteryLevel);
 
       // Update notification with battery info
@@ -228,6 +222,8 @@ Future<void> _connectToDevice(
           content: 'Service is running in the background',
         );
       }
+
+      await UserSimplePreferences.setDeviceBattery(batteryLevel);
     });
 
     log('BgService: Successfully connected to $macAddress');

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:ppwd_frontend/core/utils/user_shared_preference.dart';
 import 'package:ppwd_frontend/data/services/background_service.dart'
     as bg_service;
 import 'package:ppwd_frontend/data/services/notification_service.dart';
@@ -14,6 +15,8 @@ void main() async {
   FlutterNativeSplash.preserve(widgetsBinding: WidgetsBinding.instance);
 
   await requestPermissions();
+
+  await UserSimplePreferences.init();
 
   await NotificationService().setupFlutterNotifications(
     channelId: _fgChannelId,
