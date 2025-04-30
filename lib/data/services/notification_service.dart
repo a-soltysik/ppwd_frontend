@@ -1,6 +1,6 @@
 import 'dart:developer';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:ppwd_frontend/core/utils/user_shared_preference.dart';
 
 class NotificationService {
   static final _instance = NotificationService._();
@@ -10,12 +10,7 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
 
-  static const String _batteryNotificationKey =
-      'battery_low_notification_shown';
-  static const String _lastBatteryNotificationTimeKey =
-      'last_battery_notification_time';
-
-  static const int _batteryNotificationCooldown = 60; // in minutes
+  static const int _batteryNotificationCooldown = 60;
 
   Future<FlutterLocalNotificationsPlugin> setupFlutterNotifications({
     required String channelId,
@@ -43,13 +38,11 @@ class NotificationService {
   }
 
   Future<void> showBatteryLowNotification(int level) async {
-    final prefs = await SharedPreferences.getInstance();
-
     final hasNotificationBeenShown =
-        prefs.getBool(_batteryNotificationKey) ?? false;
+        UserSimplePreferences.getNotificationKey() ?? false;
 
     final lastNotificationTime =
-        prefs.getInt(_lastBatteryNotificationTimeKey) ?? 0;
+        UserSimplePreferences.getNotificationTime() ?? 0;
     final currentTime = DateTime.now().millisecondsSinceEpoch;
 
     log('Checking battery level for notification: $level%');
@@ -76,10 +69,10 @@ class NotificationService {
         ),
       );
 
-      await prefs.setBool(_batteryNotificationKey, true);
-      await prefs.setInt(_lastBatteryNotificationTimeKey, currentTime);
+      await UserSimplePreferences.setNotificationKey(true);
+      await UserSimplePreferences.setNotificationTime(currentTime);
     } else if (level >= 20) {
-      await prefs.remove(_batteryNotificationKey);
+      await UserSimplePreferences.removeNotificationKey();
     }
   }
 }

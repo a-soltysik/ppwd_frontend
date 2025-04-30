@@ -4,8 +4,8 @@ import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:flutter_background_service_android/flutter_background_service_android.dart'
     as bg;
+import 'package:ppwd_frontend/core/utils/user_shared_preference.dart';
 import 'package:ppwd_frontend/data/repositories/board_repository.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/models/board.dart';
 import '../../core/utils/mac_address_utils.dart';
@@ -28,8 +28,6 @@ class _BoardConnectionPageState extends State<BoardConnectionPage>
   final _connectionManager = ConnectionStateManager();
 
   Timer? _dataTimer;
-  static const String PREFS_MAC_ADDRESS = "last_connected_mac";
-  static const String PREFS_CONNECTION_ACTIVE = "connection_active";
 
   @override
   void initState() {
@@ -44,22 +42,35 @@ class _BoardConnectionPageState extends State<BoardConnectionPage>
         onDisconnected: _handleDisconnection,
       );
 
-      // Try to restore the last connected MAC address
-      final prefs = await SharedPreferences.getInstance();
-      final lastMac = prefs.getString(PREFS_MAC_ADDRESS);
-      final isActive = prefs.getBool(PREFS_CONNECTION_ACTIVE) ?? false;
-
-      if (lastMac != null && isActive) {
-        log('Restoring last connection to: $lastMac');
-        _controller.text = lastMac;
-
-        // Update UI to show we're attempting to connect
-        _connectionManager.setConnectionStatus(
-          "Restoring connection to $lastMac...",
-        );
-        _connectionManager.setConnecting(true);
-      }
+      await _checkBackgroundServiceState();
     });
+  }
+
+  Future<void> _checkBackgroundServiceState() async {
+    final lastMac = UserSimplePreferences.getMacAddress();
+    final isActive = UserSimplePreferences.getConnectionActive() ?? false;
+    final batteryLevel = UserSimplePreferences.getDeviceBattery();
+    final activeSensors = UserSimplePreferences.getActiveSensors() ?? [];
+
+    if (lastMac != null && isActive) {
+      log('Detected background service connection to: $lastMac');
+      _controller.text = lastMac;
+      _connectionManager.setConnectedDevice(lastMac);
+      _connectionManager.setConnected(true);
+      _connectionManager.setConnecting(false);
+      _connectionManager.setConnectionStatus("Connected to $lastMac");
+      _connectionManager.setActiveSensors(activeSensors);
+
+      if (batteryLevel != null) {
+        _connectionManager.setBattery(_formatBatteryLevel(batteryLevel));
+      } else {
+        _connectionManager.setBattery("N/A");
+      }
+
+      _startDataCollection(lastMac);
+    } else {
+      log('No active background connection found');
+    }
   }
 
   void _updateUI() {

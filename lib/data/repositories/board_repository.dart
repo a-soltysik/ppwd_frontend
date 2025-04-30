@@ -6,8 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_background_service_android/flutter_background_service_android.dart'
     as bg;
 import 'package:optional/optional.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
+import 'package:ppwd_frontend/core/utils/user_shared_preference.dart';
 import '../../core/models/measurement.dart';
 
 typedef ConnectionSuccessCallback =
@@ -28,8 +27,6 @@ class BoardRepository {
   static const _onConnectionSuccess = 'onConnectionSuccess';
 
   static const _loadingTimeout = Duration(seconds: 30);
-  static const String PREFS_MAC_ADDRESS = "last_connected_mac";
-  static const String PREFS_CONNECTION_ACTIVE = "connection_active";
 
   bool isLoading = false;
   Timer? _loadingTimer;
@@ -61,6 +58,8 @@ class BoardRepository {
                 args['activeSensors'] as List<dynamic>? ?? [];
             final List<String> activeSensors =
                 sensorsList.map((s) => s.toString()).toList();
+
+            await UserSimplePreferences.setActiveSensors(activeSensors);
 
             log(
               'Connection successful to $macAddress with ${activeSensors.length} active sensors',
@@ -107,11 +106,10 @@ class BoardRepository {
 
   Future<void> _saveConnectionInfo(String? macAddress, bool isActive) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
       if (macAddress != null) {
-        await prefs.setString(PREFS_MAC_ADDRESS, macAddress);
+        await UserSimplePreferences.setMacAddress(macAddress);
       }
-      await prefs.setBool(PREFS_CONNECTION_ACTIVE, isActive);
+      await UserSimplePreferences.setConnectionActive(isActive);
     } catch (e) {
       log('Error saving connection info: $e');
     }
