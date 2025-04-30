@@ -22,6 +22,8 @@ void main() async {
 
   await bg_service.initializeBackgroundService();
 
+  FlutterNativeSplash.remove();
+
   runApp(const MyApp());
 }
 
