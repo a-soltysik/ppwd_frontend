@@ -1,35 +1,44 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-          xmlns:tools="http://schemas.android.com/tools"
     package="com.example.ppwd_frontend">
-    
-    <uses-permission android:name="android.permission.BLUETOOTH" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+
+    <!-- Bluetooth permissions -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"/>
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
+    <!-- Foreground service permissions -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
 
+    <!-- Notification permissions -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- System permissions -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
         android:name="${applicationName}"
+        android:allowBackup="false"
         android:icon="@mipmap/launcher_icon"
         android:label="ppwd"
-        android:allowBackup="false"
         android:supportsRtl="true">
-        
+
         <service
-            android:name="id.flutter.flutter_background_service.BackgroundService"
+            android:name=".bluetooth.BluetoothForegroundService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="connectedDevice|dataSync|location"
-            tools:node="merge"
-            tools:replace="android:exported,android:foregroundServiceType" />
+            android:foregroundServiceType="connectedDevice" />
+
+        <receiver
+            android:name=".bluetooth.BluetoothDisconnectReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.example.ppwd_frontend.DISCONNECT_ACTION" />
+            </intent-filter>
+        </receiver>
 
         <service android:name="com.mbientlab.metawear.android.BtleService" />
 
@@ -48,10 +57,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        
+
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <meta-data
+            android:name="android.app.kill_process_on_remove_task"
+            android:value="true" />
     </application>
 
     <queries>

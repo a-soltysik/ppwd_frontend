@@ -2,6 +2,8 @@ package com.example.board_plugin;
 
 import android.util.Log;
 
+import com.example.board_plugin.connection.BluetoothConnectionManager;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,7 +29,7 @@ public class MethodChannelHandler {
     public MethodChannelHandler(MethodChannel methodChannel, BluetoothConnectionManager bluetoothManager) {
         this.methodChannel = methodChannel;
         this.bluetoothManager = bluetoothManager;
-        
+
         methodHandlers = Map.of(
                 connectToBoardFunction, this::handleConnectToBoard,
                 disconnectFromBoardFunction, this::handleDisconnectFromBoard,

@@ -3,25 +3,26 @@ import 'dart:developer';
 
 import 'package:http/http.dart' as http;
 
+import '../../core/constants/app_constants.dart';
 import '../../core/models/board.dart';
-import '../../core/utils/utils.dart';
 
 class BoardService {
-  final String _apiUrl = getApiUrl();
-  final String _apiKey = getApiKey();
-  static const _requestTimeout = Duration(seconds: 10);
+  final String _apiUrl = AppConstants.apiBaseUrl;
+  final String _apiKey = AppConstants.apiKey;
+  static const _requestTimeout = AppConstants.apiTimeout;
 
   Future<bool> sendSensorData(Board boardData) async {
     final Uri url = Uri.parse('$_apiUrl/api/measurements');
 
     try {
-      log('Sending data to $_apiUrl: ${jsonEncode(boardData)}');
+      final jsonData = jsonEncode(boardData);
+      log('Sending data to $_apiUrl: $jsonData');
 
       final http.Response response = await http
           .post(
             url,
             headers: {'Content-Type': 'application/json', 'X-Api-Key': _apiKey},
-            body: jsonEncode(boardData),
+            body: jsonData,
           )
           .timeout(_requestTimeout);
 

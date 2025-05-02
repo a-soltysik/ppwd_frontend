@@ -1,9 +1,13 @@
 package com.example.board_plugin;
 
-import java.util.List;       
-
 import android.content.Context;
+
 import androidx.annotation.NonNull;
+
+import com.example.board_plugin.connection.BluetoothConnectionManager;
+import com.example.board_plugin.setup.SensorSetupManager;
+
+import java.util.List;
 
 import io.flutter.embedding.engine.plugins.FlutterPlugin;
 import io.flutter.plugin.common.MethodChannel;
@@ -27,6 +31,7 @@ public final class BoardPlugin implements FlutterPlugin {
             public void onConnectionSuccess(String mac, int batteryLevel, List<String> activeSensors) {
                 handler.notifyConnectionSuccess(mac, batteryLevel, activeSensors);
             }
+
             @Override
             public void onDisconnection(String reason) {
                 handler.notifyDisconnection(reason);
@@ -42,7 +47,7 @@ public final class BoardPlugin implements FlutterPlugin {
             channel.setMethodCallHandler(null);
             handler = null;
         }
-         if (bluetoothManager != null) {
+        if (bluetoothManager != null) {
             bluetoothManager.disconnectFromBoard();
         }
         bluetoothManager = null;

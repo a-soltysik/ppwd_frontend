@@ -4,9 +4,12 @@ import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/constants/app_constants.dart';
 import '../../core/models/board.dart';
 import '../../data/repositories/board_repository.dart';
 import '../../data/services/board_service.dart';
+
+typedef BatteryUpdateCallback = void Function(int batteryLevel);
 
 class DataCollectionService {
   static final DataCollectionService _instance =
@@ -18,68 +21,44 @@ class DataCollectionService {
 
   Timer? _dataTimer;
   bool _isCollecting = false;
-  static const _collectionInterval = Duration(seconds: 60);
-  static const _connectionCheckInterval = Duration(seconds: 15);
+
+  static const _collectionInterval = AppConstants.dataCollectionInterval;
 
   final BoardService _boardService = BoardService();
-  Timer? _connectionCheckTimer;
-  int _failedAttempts = 0;
-  static const int _maxFailedAttempts = 3;
 
-  static const String _prefCollectionStateKey = 'data_collection_active';
-  static const String _prefDeviceMacKey = 'collection_device_mac';
+  static const String _prefCollectionStateKey =
+      AppConstants.prefCollectionState;
+  static const String _prefDeviceMacKey = AppConstants.prefDeviceMac;
 
   Future<void> startDataCollection(
     BuildContext? context,
     BoardRepository repository,
     String macAddress,
-    Function(int) onBatteryUpdated,
+    BatteryUpdateCallback onBatteryUpdated,
   ) async {
-    stopDataCollection();
+    await stopDataCollection();
 
     log('Starting data collection for device: $macAddress');
     _isCollecting = true;
 
-    // Save collection state to preferences
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_prefCollectionStateKey, true);
     await prefs.setString(_prefDeviceMacKey, macAddress);
 
-    // Periodically collect and send data
+    _scheduleDataCollection(context, repository, macAddress, onBatteryUpdated);
+
+    await collectAndSendData(context, repository, macAddress, onBatteryUpdated);
+  }
+
+  void _scheduleDataCollection(
+    BuildContext? context,
+    BoardRepository repository,
+    String macAddress,
+    BatteryUpdateCallback onBatteryUpdated,
+  ) {
     _dataTimer = Timer.periodic(_collectionInterval, (timer) {
       collectAndSendData(context, repository, macAddress, onBatteryUpdated);
     });
-
-    // Add a separate timer to check connection status more frequently
-    _connectionCheckTimer = Timer.periodic(_connectionCheckInterval, (
-      timer,
-    ) async {
-      // Check battery to verify connection is still active
-      final batteryOpt = await repository.getBatteryLevel(context);
-      if (!batteryOpt.isPresent) {
-        _failedAttempts++;
-        log(
-          'Connection check failed, attempt $_failedAttempts of $_maxFailedAttempts',
-        );
-
-        if (_failedAttempts >= _maxFailedAttempts) {
-          log('Connection appears to be lost. Stopping data collection.');
-          stopDataCollection();
-
-          // Try to reconnect
-          Timer(const Duration(seconds: 5), () {
-            repository.connectToDevice(context, macAddress);
-          });
-        }
-      } else {
-        // Reset counter on successful check
-        _failedAttempts = 0;
-        onBatteryUpdated(batteryOpt.value);
-      }
-    });
-
-    // Immediately collect data on start
-    collectAndSendData(context, repository, macAddress, onBatteryUpdated);
   }
 
   Future<void> stopDataCollection() async {
@@ -90,15 +69,7 @@ class DataCollectionService {
       _dataTimer = null;
     }
 
-    if (_connectionCheckTimer != null) {
-      _connectionCheckTimer?.cancel();
-      _connectionCheckTimer = null;
-    }
-
-    _failedAttempts = 0;
-
-    // Update preferences to reflect collection state
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_prefCollectionStateKey, false);
   }
 
@@ -107,57 +78,54 @@ class DataCollectionService {
       return true;
     }
 
-    // Double-check with stored preferences
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final prefs = await SharedPreferences.getInstance();
     return prefs.getBool(_prefCollectionStateKey) ?? false;
   }
 
-  // A synchronous version that doesn't check preferences
-  bool isCollectingSync() {
-    return _isCollecting;
-  }
+  bool isCollectingSync() => _isCollecting;
 
   Future<void> collectAndSendData(
     BuildContext? context,
     BoardRepository repository,
     String macAddress,
-    Function(int) onBatteryUpdated,
+    BatteryUpdateCallback onBatteryUpdated,
   ) async {
+    log("Collecting data for device: $macAddress");
+
     try {
-      final data = await repository.getModuleData(context);
+      final measurementsOptional = await repository.getModuleData(context);
 
-      data
-          .filter((list) => list.isNotEmpty)
-          .ifPresent(
-            (measurements) async {
-              final success = await _boardService.sendSensorData(
-                Board(macAddress, measurements),
-              );
+      measurementsOptional.ifPresent((measurements) async {
+        if (measurements.isNotEmpty) {
+          log("Found data for sensors: ${measurements.keys.join(', ')}");
 
-              if (success) {
-                log('Successfully sent data to backend');
-              } else {
-                log('Failed to send data to backend');
-              }
-
-              (await repository.getBatteryLevel(context)).ifPresent((
-                batteryLevel,
-              ) {
-                onBatteryUpdated(batteryLevel);
-              });
-            },
-            orElse: () {
-              log("No data received from board");
-            },
+          // Send data to the backend
+          final success = await _boardService.sendSensorData(
+            Board(macAddress, measurements),
           );
+
+          log(
+            success
+                ? 'Successfully sent data to backend'
+                : 'Failed to send data to backend',
+          );
+        } else {
+          log("No sensor data available");
+        }
+
+        await _updateBatteryLevel(context, repository, onBatteryUpdated);
+      });
     } catch (e) {
       log("Error collecting data: $e");
-      _failedAttempts++;
-
-      if (_failedAttempts >= _maxFailedAttempts) {
-        log('Too many data collection failures. Stopping collection.');
-        stopDataCollection();
-      }
     }
+  }
+
+  Future<void> _updateBatteryLevel(
+    BuildContext? context,
+    BoardRepository repository,
+    BatteryUpdateCallback onBatteryUpdated,
+  ) async {
+    final batteryOptional = await repository.getBatteryLevel(context);
+    batteryOptional.ifPresent(onBatteryUpdated);
   }
 }

@@ -24,3 +24,4 @@ plugins {
 
 include(":app")
 include(":board_plugin")
+project(":board_plugin").projectDir = File(rootProject.projectDir, "../board_plugin/android")
