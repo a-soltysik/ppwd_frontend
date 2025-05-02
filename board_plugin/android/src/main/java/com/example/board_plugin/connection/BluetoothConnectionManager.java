@@ -1,4 +1,4 @@
-package com.example.board_plugin;
+package com.example.board_plugin.connection;
 
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -11,6 +11,7 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.util.Log;
 
+import com.example.board_plugin.setup.SensorSetupManager;
 import com.mbientlab.metawear.android.BtleService;
 import com.mbientlab.metawear.module.Settings;
 
@@ -27,7 +28,6 @@ public class BluetoothConnectionManager implements ServiceConnection {
     private final Context context;
     private final Handler mainHandler;
     private final AtomicBoolean isConnecting = new AtomicBoolean(false);
-    private final BluetoothErrorHelper bluetoothErrorHelper = new BluetoothErrorHelper();
     private final SensorSetupManager setupManager;
 
     private BtleService.LocalBinder serviceBinder;
@@ -38,6 +38,7 @@ public class BluetoothConnectionManager implements ServiceConnection {
     private ConnectionCallback connectionCallback;
 
     private boolean isShutdownRequested = false;
+
 
     public BluetoothConnectionManager(Context context, SensorSetupManager setupManager) {
         this.context = context.getApplicationContext();
@@ -69,12 +70,10 @@ public class BluetoothConnectionManager implements ServiceConnection {
             return;
         }
 
-        // Always ensure we're properly disconnected before connecting
         if (isConnected || isServiceBound) {
             Log.i(TAG, "Disconnecting from previous connection before reconnecting");
             disconnectFromBoard();
 
-            // Small delay to ensure disconnection completes
             mainHandler.postDelayed(() -> {
                 startNewConnection(macAddress);
             }, 500);
@@ -128,7 +127,6 @@ public class BluetoothConnectionManager implements ServiceConnection {
                     Log.i(TAG, "Board is connected, tearing down routes");
                     setupManager.getBoard().tearDown();
 
-                    // Disconnect synchronously to ensure completion
                     try {
                         Log.i(TAG, "Disconnecting board and waiting for completion");
                         setupManager.getBoard().disconnectAsync().waitForCompletion();
@@ -145,7 +143,6 @@ public class BluetoothConnectionManager implements ServiceConnection {
         isConnecting.set(false);
         setupManager.clear();
 
-        // Unbind the service after disconnection
         if (isServiceBound) {
             try {
                 Log.i(TAG, "Unbinding from service");
@@ -241,12 +238,11 @@ public class BluetoothConnectionManager implements ServiceConnection {
                     Throwable error = task.getError();
                     Log.e(TAG, "Failed to connect", error);
 
-                    if (bluetoothErrorHelper.shouldRetryConnection(error) &&
-                            connectionRetries < MAX_CONNECTION_RETRIES) {
+                    // Simple retry mechanism based on counter only
+                    if (connectionRetries < MAX_CONNECTION_RETRIES) {
                         connectionRetries++;
                         Log.i(TAG, "Retrying connection, attempt " + connectionRetries);
 
-                        // Wait and retry
                         mainHandler.postDelayed(() -> {
                             if (isConnecting.get()) {
                                 connectToBoardInternal();
@@ -256,7 +252,7 @@ public class BluetoothConnectionManager implements ServiceConnection {
                         isConnecting.set(false);
                         if (connectionCallback != null) {
                             connectionCallback.onDisconnection(
-                                    bluetoothErrorHelper.getBluetoothErrorMessage(error)
+                                    "Failed to connect after " + MAX_CONNECTION_RETRIES + " attempts"
                             );
                         }
                     }

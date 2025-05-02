@@ -1,7 +1,9 @@
-package com.example.board_plugin;
+package com.example.board_plugin.setup;
 
 import android.util.Log;
 
+import com.example.board_plugin.measurement.MeasurementHandler;
+import com.example.board_plugin.measurement.MeasurementType;
 import com.mbientlab.metawear.MetaWearBoard;
 import com.mbientlab.metawear.data.Acceleration;
 import com.mbientlab.metawear.data.AngularVelocity;

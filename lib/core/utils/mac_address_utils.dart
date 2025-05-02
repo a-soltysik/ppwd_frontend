@@ -7,6 +7,7 @@ class MacAddressInputFormatter extends TextInputFormatter {
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
+    // Handle backspace when deleting a colon
     if (newValue.text.length < oldValue.text.length) {
       if (oldValue.selection.baseOffset > 0 &&
           oldValue.selection.baseOffset <= oldValue.text.length &&
@@ -47,6 +48,7 @@ class MacAddressInputFormatter extends TextInputFormatter {
     int originalCursorPos = newValue.selection.baseOffset;
     int newCursorPos = 0;
 
+    // Format the MAC address with colons after every two hex digits
     for (int i = 0; i < text.length && formatted.length < 17; i++) {
       if (hexDigitCount > 0 && hexDigitCount % 2 == 0 && hexDigitCount < 12) {
         formatted.write(':');
@@ -64,6 +66,7 @@ class MacAddressInputFormatter extends TextInputFormatter {
       }
     }
 
+    // Add a colon if the next character would need one
     if (hexDigitCount > 0 && hexDigitCount % 2 == 0 && hexDigitCount < 12) {
       formatted.write(':');
       if (insertedChars == originalCursorPos) {
@@ -78,6 +81,7 @@ class MacAddressInputFormatter extends TextInputFormatter {
   }
 }
 
+/// Widget for MAC address input with proper formatting
 class MacAddressTextField extends StatelessWidget {
   final TextEditingController controller;
   final bool enabled;
@@ -109,4 +113,36 @@ class MacAddressTextField extends StatelessWidget {
       enableSuggestions: false,
     );
   }
+}
+
+/// Validates if a string is a properly formatted MAC address
+bool isValidMacAddress(String mac) {
+  if (mac.isEmpty) {
+    return false;
+  }
+
+  // Must be 17 characters (12 hex digits + 5 colons)
+  if (mac.length != 17) {
+    return false;
+  }
+
+  // Check colons at correct positions
+  for (int i = 2; i < 17; i += 3) {
+    if (mac[i] != ':') {
+      return false;
+    }
+  }
+
+  // Verify all other characters are hex digits
+  for (int i = 0; i < 17; i++) {
+    if (i % 3 == 2) {
+      continue; // Skip colons
+    }
+
+    if (!RegExp(r'[0-9A-Fa-f]').hasMatch(mac[i])) {
+      return false;
+    }
+  }
+
+  return true;
 }

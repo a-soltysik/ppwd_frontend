@@ -1,4 +1,4 @@
-package com.example.board_plugin;
+package com.example.board_plugin.measurement;
 
 import androidx.annotation.NonNull;
 
