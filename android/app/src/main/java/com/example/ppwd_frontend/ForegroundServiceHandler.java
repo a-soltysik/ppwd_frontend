@@ -9,7 +9,9 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 
-import com.example.ppwd_frontend.bluetooth.BluetoothForegroundService;
+import com.example.board_plugin.NotificationHelper;
+import com.example.board_plugin.ResourceHelper;
+import com.example.board_plugin.connection.BluetoothForegroundService;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -32,7 +34,6 @@ public class ForegroundServiceHandler implements MethodChannel.MethodCallHandler
         this.methodChannel = new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), CHANNEL);
         this.methodChannel.setMethodCallHandler(this);
 
-        // Register broadcast receiver for data updates
         this.dataReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -41,7 +42,6 @@ public class ForegroundServiceHandler implements MethodChannel.MethodCallHandler
                     int batteryLevel = intent.getIntExtra("batteryLevel", 0);
                     boolean hasNewData = intent.getBooleanExtra("hasNewData", false);
 
-                    // Send data to Flutter
                     Map<String, Object> dataMap = new HashMap<>();
                     dataMap.put("macAddress", macAddress);
                     dataMap.put("batteryLevel", batteryLevel);
@@ -53,18 +53,23 @@ public class ForegroundServiceHandler implements MethodChannel.MethodCallHandler
             }
         };
 
-        // Register broadcast receiver for disconnection
         this.disconnectReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
                 if ("com.example.ppwd_frontend.DISCONNECT".equals(intent.getAction())) {
-                    // Notify Flutter that service was disconnected
+                    int appIconId = ResourceHelper.getAppIconResourceId(context);
+                    NotificationHelper notificationHelper = new NotificationHelper(context, appIconId);
+                    notificationHelper.showBluetoothDisconnectionNotification("Service manually disconnected");
+
                     methodChannel.invokeMethod("onDisconnect", null);
                 }
             }
         };
 
-        // Register receivers with proper flags based on Android version
+        registerReceivers();
+    }
+
+    private void registerReceivers() {
         IntentFilter dataFilter = new IntentFilter("com.example.ppwd_frontend.DATA_AVAILABLE");
         IntentFilter disconnectFilter = new IntentFilter("com.example.ppwd_frontend.DISCONNECT");
 
@@ -106,7 +111,11 @@ public class ForegroundServiceHandler implements MethodChannel.MethodCallHandler
         Intent serviceIntent = new Intent(context, BluetoothForegroundService.class);
         serviceIntent.putExtra("macAddress", macAddress);
 
-        context.startForegroundService(serviceIntent);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(serviceIntent);
+        } else {
+            context.startService(serviceIntent);
+        }
     }
 
     private void stopForegroundService() {

@@ -26,6 +26,8 @@ class AppTheme {
   static const Color backgroundColor = Colors.white;
   static const Color cardColor = Colors.white;
 
+  static const Color warningColor = Colors.amber;
+
   // Main theme data
   static ThemeData get lightTheme {
     return ThemeData(

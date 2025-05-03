@@ -2,6 +2,7 @@ package com.example.board_plugin.connection;
 
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -11,6 +12,8 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.util.Log;
 
+import com.example.board_plugin.NotificationHelper;
+import com.example.board_plugin.ResourceHelper;
 import com.example.board_plugin.setup.SensorSetupManager;
 import com.mbientlab.metawear.android.BtleService;
 import com.mbientlab.metawear.module.Settings;
@@ -102,19 +105,25 @@ public class BluetoothConnectionManager implements ServiceConnection {
             );
 
             if (!isServiceBound) {
-                Log.e(TAG, "Failed to bind to service");
-                isConnecting.set(false);
-                if (connectionCallback != null) {
-                    connectionCallback.onDisconnection("Failed to bind to Bluetooth service");
-                }
+                handleError("Failed to connect to Bluetooth service");
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error binding to BtleService", e);
-            isConnecting.set(false);
-            if (connectionCallback != null) {
-                connectionCallback.onDisconnection("Failed to initialize Bluetooth service: " + e.getMessage());
-            }
+            handleError("Service connection error: " + e.getMessage());
         }
+    }
+
+    private void handleError(String message) {
+        Log.e(TAG, message);
+        isConnecting.set(false);
+        if (connectionCallback != null) {
+            connectionCallback.onDisconnection(message);
+        }
+    }
+
+    private void reset() {
+        isConnected = false;
+        isConnecting.set(false);
+        setupManager.clear();
     }
 
     public void disconnectFromBoard() {
@@ -139,9 +148,7 @@ public class BluetoothConnectionManager implements ServiceConnection {
             }
         }
 
-        isConnected = false;
-        isConnecting.set(false);
-        setupManager.clear();
+        reset();
 
         if (isServiceBound) {
             try {
@@ -158,16 +165,19 @@ public class BluetoothConnectionManager implements ServiceConnection {
     public void onServiceConnected(ComponentName name, IBinder service) {
         Log.i(TAG, "Service connected");
         serviceBinder = (BtleService.LocalBinder) service;
-        connectToBoardInternal();
+        connectToBoard();
     }
 
     @Override
     public void onServiceDisconnected(ComponentName name) {
         Log.i(TAG, "BT Service Disconnected");
-        isConnected = false;
+
+        reset();
         isServiceBound = false;
-        isConnecting.set(false);
-        setupManager.clear();
+
+        int appIconId = ResourceHelper.getAppIconResourceId(context);
+        NotificationHelper notificationHelper = new NotificationHelper(context, appIconId);
+        notificationHelper.showBluetoothDisconnectionNotification("Bluetooth service disconnected");
 
         if (!isShutdownRequested && connectionCallback != null) {
             connectionCallback.onDisconnection("Bluetooth service disconnected");
@@ -181,109 +191,98 @@ public class BluetoothConnectionManager implements ServiceConnection {
         }
     }
 
-    private void connectToBoardInternal() {
+    private BluetoothDevice getBluetoothDevice() {
         try {
-            android.bluetooth.BluetoothManager btManager = (android.bluetooth.BluetoothManager)
+            BluetoothManager btManager = (BluetoothManager)
                     context.getSystemService(Context.BLUETOOTH_SERVICE);
 
             if (btManager == null) {
-                Log.e(TAG, "BluetoothManager is null");
-                isConnecting.set(false);
-                if (connectionCallback != null) {
-                    connectionCallback.onDisconnection("Bluetooth manager unavailable");
-                }
-                return;
+                handleError("Bluetooth manager unavailable");
+                return null;
             }
 
             BluetoothAdapter adapter = btManager.getAdapter();
             if (adapter == null) {
-                Log.e(TAG, "BluetoothAdapter is null");
-                isConnecting.set(false);
-                if (connectionCallback != null) {
-                    connectionCallback.onDisconnection("Bluetooth adapter unavailable");
-                }
-                return;
+                handleError("Bluetooth adapter unavailable");
+                return null;
             }
 
             if (!adapter.isEnabled()) {
-                Log.e(TAG, "Bluetooth is not enabled");
-                isConnecting.set(false);
-                if (connectionCallback != null) {
-                    connectionCallback.onDisconnection("Bluetooth is turned off");
-                }
-                return;
+                handleError("Bluetooth is turned off");
+                return null;
             }
 
-            BluetoothDevice btDevice;
             try {
-                btDevice = adapter.getRemoteDevice(macAddress);
-                if (btDevice == null) {
-                    throw new IllegalArgumentException("Could not find device with address: " + macAddress);
-                }
+                return adapter.getRemoteDevice(macAddress);
             } catch (IllegalArgumentException e) {
-                Log.e(TAG, "Invalid MAC address: " + macAddress, e);
-                isConnecting.set(false);
-                if (connectionCallback != null) {
-                    connectionCallback.onDisconnection("Invalid MAC address format");
+                handleError("Invalid MAC address: " + macAddress);
+                return null;
+            }
+        } catch (Exception e) {
+            handleError("Error getting Bluetooth device: " + e.getMessage());
+            return null;
+        }
+    }
+
+    private void handleConnectionFailure(Throwable error) {
+        Log.e(TAG, "Connection failed", error);
+
+        if (connectionRetries < MAX_CONNECTION_RETRIES) {
+            connectionRetries++;
+            Log.d(TAG, "Retry " + connectionRetries + "/" + MAX_CONNECTION_RETRIES);
+
+            mainHandler.postDelayed(() -> {
+                if (isConnecting.get()) {
+                    connectToBoard();
                 }
+            }, CONNECTION_RETRY_DELAY_MS);
+        } else {
+            handleError("Failed to connect after " + MAX_CONNECTION_RETRIES + " attempts");
+        }
+    }
+
+    private void handleConnectionSuccess() {
+        Log.i(TAG, "Successfully connected to device");
+        connectionRetries = 0;
+        isConnected = true;
+        setupManager.start();
+
+        setupSensors();
+        readBatteryLevel();
+
+        mainHandler.postDelayed(() -> {
+            isConnecting.set(false);
+            if (connectionCallback != null) {
+                connectionCallback.onConnectionSuccess(
+                        macAddress,
+                        setupManager.getBatteryLevel(),
+                        setupManager.getActiveSensors()
+                );
+            }
+        }, 1000);
+    }
+
+
+    private void connectToBoard() {
+        try {
+            var device = getBluetoothDevice();
+            if (device == null) {
                 return;
             }
 
-            // Set up a new board instance
-            setupManager.setBoard(serviceBinder.getMetaWearBoard(btDevice));
+            setupManager.setBoard(serviceBinder.getMetaWearBoard(device));
 
-            Log.i(TAG, "Attempting to connect to device: " + macAddress);
+            Log.d(TAG, "Connecting to device: " + macAddress);
             setupManager.getBoard().connectAsync().continueWith(task -> {
                 if (task.isFaulted()) {
-                    Throwable error = task.getError();
-                    Log.e(TAG, "Failed to connect", error);
-
-                    // Simple retry mechanism based on counter only
-                    if (connectionRetries < MAX_CONNECTION_RETRIES) {
-                        connectionRetries++;
-                        Log.i(TAG, "Retrying connection, attempt " + connectionRetries);
-
-                        mainHandler.postDelayed(() -> {
-                            if (isConnecting.get()) {
-                                connectToBoardInternal();
-                            }
-                        }, CONNECTION_RETRY_DELAY_MS);
-                    } else {
-                        isConnecting.set(false);
-                        if (connectionCallback != null) {
-                            connectionCallback.onDisconnection(
-                                    "Failed to connect after " + MAX_CONNECTION_RETRIES + " attempts"
-                            );
-                        }
-                    }
+                    handleConnectionFailure(task.getError());
                 } else {
-                    Log.i(TAG, "Successfully connected to device");
-                    connectionRetries = 0;
-                    isConnected = true;
-                    setupManager.start();
-
-                    setupSensors();
-                    readBatteryLevel();
-
-                    mainHandler.postDelayed(() -> {
-                        isConnecting.set(false);
-                        if (connectionCallback != null) {
-                            connectionCallback.onConnectionSuccess(
-                                    macAddress,
-                                    setupManager.getBatteryLevel(),
-                                    setupManager.getActiveSensors()
-                            );
-                        }
-                    }, 1000);
+                    handleConnectionSuccess();
                 }
                 return null;
             });
         } catch (Exception e) {
-            Log.e(TAG, "Error connecting to device", e);
-            isConnecting.set(false);
-            if (connectionCallback != null) {
-                connectionCallback.onDisconnection("Connection error: " + e.getMessage());
-            }
+            handleError("Connection error: " + e.getMessage());
         }
     }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
+import 'network_status_widget.dart';
 
 class ConnectionStatusCard extends StatelessWidget {
   final bool isConnected;
@@ -10,6 +11,8 @@ class ConnectionStatusCard extends StatelessWidget {
   final String battery;
   final int batteryLevel;
   final bool isServiceRunning;
+  final bool isNetworkConnected;
+  final int cachedRequestsCount;
 
   const ConnectionStatusCard({
     super.key,
@@ -19,6 +22,8 @@ class ConnectionStatusCard extends StatelessWidget {
     required this.battery,
     required this.batteryLevel,
     required this.isServiceRunning,
+    required this.isNetworkConnected,
+    required this.cachedRequestsCount,
   });
 
   @override
@@ -28,19 +33,7 @@ class ConnectionStatusCard extends StatelessWidget {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            Text(
-              isConnecting
-                  ? "Status: Connecting..."
-                  : "Status: ${isConnected ? 'Connected' : 'Disconnected'}",
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color:
-                    isConnecting
-                        ? Colors.orange
-                        : (isConnected ? Colors.green : Colors.red),
-              ),
-            ),
+            _buildStatusHeader(),
             const SizedBox(height: 8),
             Text(connectionStatus),
             if (isConnected) ...[
@@ -48,9 +41,30 @@ class ConnectionStatusCard extends StatelessWidget {
               _buildBatteryIndicator(),
               const SizedBox(height: 8),
               _buildServiceStatusIndicator(),
+              const SizedBox(height: 8),
+              NetworkStatusWidget(
+                isNetworkConnected: isNetworkConnected,
+                cachedRequestsCount: cachedRequestsCount,
+              ),
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildStatusHeader() {
+    return Text(
+      isConnecting
+          ? "Status: Connecting..."
+          : "Status: ${isConnected ? 'Connected' : 'Disconnected'}",
+      style: TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.bold,
+        color:
+            isConnecting
+                ? Colors.orange
+                : (isConnected ? Colors.green : Colors.red),
       ),
     );
   }

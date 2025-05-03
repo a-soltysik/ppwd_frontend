@@ -16,9 +16,4 @@ class AppConstants {
 
   // SharedPreferences Keys
   static const String prefMacAddress = "last_connected_mac";
-  static const String prefConnectionActive = "connection_active";
-  static const String prefDeviceBattery = "device_battery_level";
-  static const String prefActiveSensors = "active_sensors";
-  static const String prefCollectionState = "data_collection_active";
-  static const String prefDeviceMac = "collection_device_mac";
 }

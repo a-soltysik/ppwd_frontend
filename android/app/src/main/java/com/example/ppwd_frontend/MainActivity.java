@@ -6,9 +6,10 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 
 import com.example.board_plugin.MethodChannelHandler;
+import com.example.board_plugin.NotificationHelper;
 import com.example.board_plugin.connection.BluetoothConnectionManager;
+import com.example.board_plugin.connection.BluetoothForegroundService;
 import com.example.board_plugin.setup.SensorSetupManager;
-import com.example.ppwd_frontend.bluetooth.BluetoothForegroundService;
 
 import java.util.List;
 
@@ -33,7 +34,7 @@ public class MainActivity extends FlutterActivity implements BluetoothConnection
 
         Log.i(TAG, "Configuring Flutter engine");
 
-        notificationHelper = new NotificationHelper(this);
+        notificationHelper = new NotificationHelper(this, R.mipmap.ic_launcher);
 
         SensorSetupManager setupManager = new SensorSetupManager();
         bluetoothManager = new BluetoothConnectionManager(this, setupManager);

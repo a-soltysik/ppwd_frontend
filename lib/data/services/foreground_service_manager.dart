@@ -1,7 +1,6 @@
-import 'dart:developer';
-
 import 'package:flutter/services.dart';
 
+import '../../core/utils/logger.dart';
 import '../repositories/board_repository.dart';
 import 'data_collection_service.dart';
 
@@ -56,9 +55,17 @@ class ForegroundServiceManager {
     final macAddress = args['macAddress'] as String? ?? '';
     if (macAddress.isEmpty) return;
 
-    log("New sensor data available, triggering collection");
+    final batteryLevel = args['batteryLevel'] as int? ?? 0;
 
-    await DataCollectionService().collectAndSendData(
+    Logger.i("Received data from foreground service, collecting...");
+
+    if (_onBatteryUpdate != null) {
+      _onBatteryUpdate!(batteryLevel);
+    }
+
+    final dataCollectionService = DataCollectionService();
+
+    await dataCollectionService.collectAndSendData(
       null,
       BoardRepository(),
       macAddress,
@@ -68,6 +75,10 @@ class ForegroundServiceManager {
         }
       },
     );
+
+    if (hasNewData) {
+      await dataCollectionService.sendCachedData();
+    }
   }
 
   Future<void> _handleDisconnect() async {
@@ -87,7 +98,7 @@ class ForegroundServiceManager {
       _isRunning = result ?? false;
       return _isRunning;
     } on PlatformException catch (e) {
-      log('Error starting foreground service: ${e.message}');
+      Logger.e('Error starting foreground service', error: e.message);
       return false;
     }
   }
@@ -98,7 +109,7 @@ class ForegroundServiceManager {
       _isRunning = !(result ?? false);
       return !_isRunning;
     } on PlatformException catch (e) {
-      log('Error stopping foreground service: ${e.message}');
+      Logger.e('Error stopping foreground service', error: e.message);
       return false;
     }
   }

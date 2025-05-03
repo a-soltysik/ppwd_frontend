@@ -5,6 +5,7 @@ import 'package:ppwd_frontend/core/utils/user_shared_preference.dart';
 import 'package:ppwd_frontend/presentation/navigation/app_navigation_bar.dart';
 
 import 'core/theme/app_theme.dart';
+import 'core/utils/logger.dart';
 
 void main() async {
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
@@ -60,11 +61,11 @@ Future<void> requestPermissions() async {
 
     final status = await permission.request();
     if (status.isDenied || status.isPermanentlyDenied) {
-      print('$permissionName permission denied');
+      Logger.e('$permissionName permission denied');
       needOpenSettings = true;
     }
   }
-  
+
   if (needOpenSettings) {
     await openAppSettings();
   }

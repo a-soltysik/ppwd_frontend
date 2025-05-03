@@ -1,5 +1,6 @@
-package com.example.ppwd_frontend.bluetooth;
+package com.example.board_plugin.connection;
 
+import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
 import android.os.IBinder;
@@ -7,9 +8,9 @@ import android.util.Log;
 
 import androidx.annotation.Nullable;
 
-import com.example.board_plugin.connection.BluetoothConnectionManager;
+import com.example.board_plugin.NotificationHelper;
+import com.example.board_plugin.ResourceHelper;
 import com.example.board_plugin.setup.SensorSetupManager;
-import com.example.ppwd_frontend.NotificationHelper;
 
 import java.util.Timer;
 import java.util.TimerTask;
@@ -30,7 +31,9 @@ public class BluetoothForegroundService extends Service {
         super.onCreate();
         Log.i(TAG, "Foreground service created");
 
-        notificationHelper = new NotificationHelper(this);
+        int appIconResId = ResourceHelper.getAppIconResourceId(this);
+
+        notificationHelper = new NotificationHelper(this, appIconResId);
         var setupManager = new SensorSetupManager();
         bluetoothManager = new BluetoothConnectionManager(this, setupManager);
         bluetoothManager.setConnectionCallback(new BluetoothConnectionManager.ConnectionCallback() {
@@ -52,6 +55,9 @@ public class BluetoothForegroundService extends Service {
             public void onDisconnection(String reason) {
                 Log.i(TAG, "Disconnected: " + reason);
                 connectedMacAddress = null;
+
+                notificationHelper.showBluetoothDisconnectionNotification(reason);
+
                 stopForeground(true);
                 stopSelf();
             }
@@ -66,8 +72,13 @@ public class BluetoothForegroundService extends Service {
             connectedMacAddress = intent.getStringExtra("macAddress");
             Log.i(TAG, "Service connecting to: " + connectedMacAddress);
 
+            Intent disconnectIntent = new Intent("com.example.ppwd_frontend.DISCONNECT");
+            PendingIntent disconnectPendingIntent = PendingIntent.getBroadcast(
+                    this, 0, disconnectIntent, PendingIntent.FLAG_IMMUTABLE);
+
             startForeground(NotificationHelper.FOREGROUND_NOTIFICATION_ID,
-                    notificationHelper.createForegroundNotification(connectedMacAddress, batteryLevel));
+                    notificationHelper.createForegroundNotification(
+                            connectedMacAddress, batteryLevel, disconnectPendingIntent));
 
             if (connectedMacAddress != null && !connectedMacAddress.isEmpty()) {
                 bluetoothManager.connectToDevice(connectedMacAddress);
@@ -80,7 +91,6 @@ public class BluetoothForegroundService extends Service {
 
         return START_STICKY;
     }
-
 
     private void startConnectionChecks() {
         if (connectionCheckTimer != null) {
@@ -143,12 +153,21 @@ public class BluetoothForegroundService extends Service {
     }
 
     private void updateNotification() {
-        notificationHelper.updateForegroundNotification(connectedMacAddress, batteryLevel);
+        Intent disconnectIntent = new Intent("com.example.ppwd_frontend.DISCONNECT");
+        PendingIntent disconnectPendingIntent = PendingIntent.getBroadcast(
+                this, 0, disconnectIntent, PendingIntent.FLAG_IMMUTABLE);
+
+        notificationHelper.updateForegroundNotification(
+                connectedMacAddress, batteryLevel, disconnectPendingIntent);
     }
 
     private void checkBatteryLevel() {
+        Intent disconnectIntent = new Intent("com.example.ppwd_frontend.DISCONNECT");
+        PendingIntent disconnectPendingIntent = PendingIntent.getBroadcast(
+                this, 0, disconnectIntent, PendingIntent.FLAG_IMMUTABLE);
+
         lastBatteryNotificationTime = notificationHelper.checkAndNotifyLowBattery(
-                batteryLevel, previousBatteryLevel, lastBatteryNotificationTime);
+                batteryLevel, previousBatteryLevel, lastBatteryNotificationTime, disconnectPendingIntent);
     }
 
     @Nullable
