@@ -2,17 +2,30 @@
     package="com.example.ppwd_frontend">
 
     <!-- Bluetooth permissions -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+
+    <!-- Location permissions - needed for Bluetooth scanning -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <!-- Foreground service permissions -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <!-- Only use FOREGROUND_SERVICE_CONNECTED_DEVICE on Android 14+ -->
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"
+        android:minSdkVersion="34" />
 
-    <!-- Notification permissions -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Notification permissions - only needed on Android 13+ -->
+    <uses-permission
+        android:name="android.permission.POST_NOTIFICATIONS"
+        android:minSdkVersion="33" />
 
     <!-- System permissions -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -26,13 +39,13 @@
         android:supportsRtl="true">
 
         <service
-            android:name=".bluetooth.BluetoothForegroundService"
+            android:name="com.example.board_plugin.connection.BluetoothForegroundService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
 
         <receiver
-            android:name=".bluetooth.BluetoothDisconnectReceiver"
+            android:name="com.example.board_plugin.connection.BluetoothDisconnectReceiver"
             android:enabled="true"
             android:exported="false">
             <intent-filter>

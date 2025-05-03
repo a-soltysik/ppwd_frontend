@@ -1,20 +1,48 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../constants/app_constants.dart';
+import 'logger.dart';
 
 class UserSimplePreferences {
-  static late SharedPreferences _preferences;
+  static SharedPreferences? _preferences;
 
-  static String get PREFS_MAC_ADDRESS => AppConstants.prefMacAddress;
-
-  static Future init() async =>
+  static Future init() async {
+    try {
       _preferences = await SharedPreferences.getInstance();
+      Logger.i('SharedPreferences initialized successfully');
+    } catch (e) {
+      Logger.e('Error initializing SharedPreferences', error: e);
+      throw Exception('Failed to initialize SharedPreferences');
+    }
+  }
 
-  static Future<void> setMacAddress(String mac) async =>
-      await _preferences.setString(PREFS_MAC_ADDRESS, mac);
+  static String? getMacAddress() {
+    if (_preferences == null) {
+      Logger.w('SharedPreferences not initialized when getting MAC address');
+      return null;
+    }
 
-  static String? getMacAddress() => _preferences.getString(PREFS_MAC_ADDRESS);
+    final String? mac = _preferences!.getString('mac_address');
+    Logger.d('Retrieved MAC address: $mac');
+    return mac;
+  }
 
-  static Future<void> removeMacAddress() =>
-      _preferences.remove(PREFS_MAC_ADDRESS);
+  static Future<bool> setMacAddress(String mac) async {
+    if (_preferences == null) {
+      Logger.w('SharedPreferences not initialized when setting MAC address');
+      await init();
+    }
+
+    Logger.d('Saving MAC address: $mac');
+    return await _preferences!.setString('mac_address', mac);
+  }
+
+  static Future<bool> removeMacAddress() async {
+    if (_preferences == null) {
+      Logger.w('SharedPreferences not initialized when removing MAC address');
+      return false;
+    }
+
+    Logger.d('Removing MAC address from preferences');
+    return await _preferences!.remove('mac_address');
+  }
 }

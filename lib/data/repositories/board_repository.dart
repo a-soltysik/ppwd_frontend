@@ -1,9 +1,8 @@
-import 'dart:developer';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:optional/optional.dart';
 import 'package:ppwd_frontend/core/utils/error_handler.dart';
+import 'package:ppwd_frontend/core/utils/logger.dart';
 import 'package:ppwd_frontend/core/utils/user_shared_preference.dart';
 
 import '../../core/models/measurement.dart';
@@ -60,13 +59,11 @@ class BoardRepository {
   void _handleConnectionSuccess(dynamic arguments, BuildContext? context) {
     if (_onConnectionSuccessCallback == null) return;
 
-    final Map<dynamic, dynamic> args = arguments as Map<dynamic, dynamic>;
-    final String macAddress = args['macAddress'] as String? ?? '';
-    final int batteryLevel = args['batteryLevel'] as int? ?? 0;
-    final List<dynamic> sensorsList =
-        args['activeSensors'] as List<dynamic>? ?? [];
-    final List<String> activeSensors =
-        sensorsList.map((s) => s.toString()).toList();
+    final args = arguments as Map<dynamic, dynamic>;
+    final macAddress = args['macAddress'] as String? ?? '';
+    final batteryLevel = args['batteryLevel'] as int? ?? 0;
+    final sensorsList = args['activeSensors'] as List<dynamic>? ?? [];
+    final activeSensors = sensorsList.map((s) => s.toString()).toList();
 
     _saveConnectionData(macAddress, activeSensors);
     _onConnectionSuccessCallback!(macAddress, batteryLevel, activeSensors);
@@ -76,7 +73,7 @@ class BoardRepository {
     String macAddress,
     List<String> activeSensors,
   ) async {
-    log(
+    Logger.i(
       'Connection successful to $macAddress with ${activeSensors.length} active sensors',
     );
 
@@ -86,7 +83,7 @@ class BoardRepository {
 
   void _handleDisconnection(dynamic arguments, BuildContext? context) async {
     final reason = arguments as String? ?? 'Unknown reason';
-    log('Device disconnected: $reason');
+    Logger.i('Device disconnected: $reason');
 
     _isConnected = false;
 
@@ -153,7 +150,7 @@ class BoardRepository {
 
       ErrorHandler.showSuccessMessage(context, 'Disconnected from device');
     } catch (e) {
-      log("Error disconnecting: $e");
+      Logger.e("Error disconnecting", error: e);
 
       if (context != null && context.mounted) {
         ErrorHandler.showSuccessMessage(context, 'Error disconnecting: $e');

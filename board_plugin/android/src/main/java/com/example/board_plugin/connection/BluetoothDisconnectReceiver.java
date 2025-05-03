@@ -1,11 +1,12 @@
-package com.example.ppwd_frontend.bluetooth;
+package com.example.board_plugin.connection;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.util.Log;
 
-import com.example.ppwd_frontend.NotificationHelper;
+import com.example.board_plugin.NotificationHelper;
+import com.example.board_plugin.ResourceHelper;
 
 public class BluetoothDisconnectReceiver extends BroadcastReceiver {
     private static final String TAG = "BtDisconnectReceiver";
@@ -14,7 +15,7 @@ public class BluetoothDisconnectReceiver extends BroadcastReceiver {
     public void onReceive(Context context, Intent intent) {
         Log.i(TAG, "Disconnect button pressed");
 
-        new NotificationHelper(context).showAppKilledNotification();
+        new NotificationHelper(context, ResourceHelper.getAppIconResourceId(context)).showAppKilledNotification();
 
         var serviceIntent = new Intent(context, BluetoothForegroundService.class);
         context.stopService(serviceIntent);

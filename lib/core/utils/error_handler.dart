@@ -1,56 +1,51 @@
-import 'dart:developer';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:optional/optional.dart';
 
+import 'logger.dart';
+
 class ErrorHandler {
+  ErrorHandler._();
+
   static Future<Optional<T>> handleMethodCall<T>(
     String methodName,
-    Future<T?> Function() operation,
-    BuildContext? context,
-  ) async {
+    Future<T> Function() callback,
+    BuildContext? context, {
+    bool showErrorMessages = true,
+  }) async {
     try {
-      return Optional.ofNullable(await operation());
-    } on PlatformException catch (e) {
-      log("PlatformException: ${e.code}, ${e.message}");
-      _showErrorMessage(context, _getPlatformErrorMessage(e));
-      return Optional.empty();
-    } on MissingPluginException {
-      log("Method $methodName is not implemented!");
-      _showErrorMessage(context, 'Method $methodName is not implemented!');
-      return Optional.empty();
+      final result = await callback();
+      return Optional.of(result);
     } catch (e) {
-      log("Unexpected error: $e");
-      _showErrorMessage(context, 'Unexpected error: $e');
+      Logger.e('Error in $methodName', error: e);
+
+      if (context != null && context.mounted && showErrorMessages) {
+        _showSnackbar(context, _extractErrorMessage(e), Colors.red);
+      }
+
       return Optional.empty();
     }
   }
 
-  static String _getPlatformErrorMessage(PlatformException e) {
-    switch (e.code) {
-      case 'ALREADY_CONNECTING':
-        return 'Already attempting to connect to a device. Please wait.';
-      case 'INVALID_MAC':
-        return 'Invalid MAC address format.';
-      default:
-        return e.message ?? 'Unknown error';
-    }
+  static String _extractErrorMessage(Object error) {
+    final msg = error.toString();
+    final parts = msg.split('Exception:');
+    return parts.length > 1 ? parts.last.trim() : msg;
   }
 
-  static void _showErrorMessage(BuildContext? context, String message) {
-    if (context != null && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $message'), backgroundColor: Colors.red),
+  static void _showSnackbar(BuildContext context, String message, Color color) {
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: color,
+          duration: const Duration(seconds: 3),
+        ),
       );
-    }
   }
 
   static void showSuccessMessage(BuildContext? context, String message) {
-    if (context != null && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: Colors.blue),
-      );
-    }
+    if (context == null || !context.mounted) return;
+    _showSnackbar(context, message, Colors.green);
   }
 }
