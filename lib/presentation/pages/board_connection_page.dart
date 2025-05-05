@@ -225,13 +225,13 @@ class _BoardConnectionPageState extends State<BoardConnectionPage>
               ),
 
               const SizedBox(height: 24),
-
-              BluetoothDeviceSelector(
-                onDeviceSelected: (macAddress) {
-                  _controller.text = macAddress;
-                  connect(macAddress); // optional auto-connect
-                },
-              ),
+              if (!isConnected && !isConnecting)
+                BluetoothDeviceSelector(
+                  onDeviceSelected: (macAddress) {
+                    _controller.text = macAddress;
+                    connect(macAddress);
+                  },
+                ),
               const SizedBox(height: 24),
               Form(
                 key: _formKey,

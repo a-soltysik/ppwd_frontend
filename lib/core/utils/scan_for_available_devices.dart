@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class BluetoothDeviceSelector extends StatefulWidget {
   final Function(String macAddress) onDeviceSelected;
@@ -14,16 +16,47 @@ class BluetoothDeviceSelector extends StatefulWidget {
 class _BluetoothDeviceSelectorState extends State<BluetoothDeviceSelector> {
   bool _isScanning = false;
   List<ScanResult> _scanResults = [];
+  StreamSubscription<List<ScanResult>>? _scanSubscription;
 
-  void _startScan() async {
+  @override
+  void dispose() {
+    _stopScan();
+    super.dispose();
+  }
+
+  Future<bool> _checkPermissions() async {
+    final statuses =
+        await [
+          Permission.bluetoothScan,
+          Permission.bluetoothConnect,
+          Permission.location,
+        ].request();
+
+    return statuses.values.every((status) => status.isGranted);
+  }
+
+  Future<void> _startScan() async {
     setState(() {
       _scanResults.clear();
       _isScanning = true;
     });
 
-    FlutterBluePlus.startScan(timeout: const Duration(seconds: 5));
+    final adapterState = await FlutterBluePlus.adapterState.first;
+    if (adapterState != BluetoothAdapterState.on) {
+      debugPrint("Bluetooth is not ON");
+      setState(() => _isScanning = false);
+      return;
+    }
 
-    FlutterBluePlus.scanResults.listen((results) {
+    if (!await _checkPermissions()) {
+      debugPrint("Bluetooth permissions not granted");
+      setState(() => _isScanning = false);
+      return;
+    }
+
+    await FlutterBluePlus.startScan(timeout: const Duration(seconds: 5));
+
+    _scanSubscription = FlutterBluePlus.scanResults.listen((results) {
       setState(() {
         _scanResults =
             results.where((r) => r.device.platformName.isNotEmpty).toList();
@@ -31,9 +64,15 @@ class _BluetoothDeviceSelectorState extends State<BluetoothDeviceSelector> {
     });
 
     await Future.delayed(const Duration(seconds: 5));
+    await _stopScan();
+  }
 
-    FlutterBluePlus.stopScan();
-    setState(() => _isScanning = false);
+  Future<void> _stopScan() async {
+    if (_isScanning) {
+      await FlutterBluePlus.stopScan();
+      await _scanSubscription?.cancel();
+      setState(() => _isScanning = false);
+    }
   }
 
   void _showScanDialog() {
@@ -70,7 +109,7 @@ class _BluetoothDeviceSelectorState extends State<BluetoothDeviceSelector> {
             actions: [
               TextButton(
                 onPressed: () {
-                  FlutterBluePlus.stopScan();
+                  _stopScan();
                   Navigator.of(context).pop();
                 },
                 child: const Text("Cancel"),

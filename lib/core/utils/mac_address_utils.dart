@@ -98,6 +98,10 @@ class _MacAddressTextFieldState extends State<MacAddressTextField> {
   final LayerLink _layerLink = LayerLink();
   OverlayEntry? _overlayEntry;
   List<String> _macSuggestions = [];
+  bool _isValidMac(String mac) {
+    final macRegExp = RegExp(r'^([0-9A-F]{2}:){5}[0-9A-F]{2}$');
+    return macRegExp.hasMatch(mac);
+  }
 
   @override
   void initState() {
@@ -108,6 +112,10 @@ class _MacAddressTextFieldState extends State<MacAddressTextField> {
         _showOverlay();
       } else {
         _removeOverlay();
+        final mac = widget.controller.text.toUpperCase();
+        if (_isValidMac(mac)) {
+          _saveMacAddress(mac);
+        }
       }
     });
   }
@@ -219,7 +227,9 @@ class _MacAddressTextFieldState extends State<MacAddressTextField> {
         autocorrect: false,
         enableSuggestions: false,
         onFieldSubmitted: (value) async {
-          await _saveMacAddress(value.toUpperCase());
+          if (_isValidMac(value)) {
+            await _saveMacAddress(value.toUpperCase());
+          }
           _focusNode.unfocus();
         },
       ),
