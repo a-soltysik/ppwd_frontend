@@ -1,0 +1,26 @@
+plugins { id 'com.android.library' }
+
+android {
+    namespace  "com.example.board_plugin"
+    compileSdk 35
+    defaultConfig { minSdk 21 }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+repositories {
+    google()
+    mavenCentral()
+    ivy {
+        url "https://mbientlab.com/releases/ivyrep"
+        layout "gradle"
+    }
+}
+
+dependencies {
+    implementation "com.mbientlab:metawear:4.0.0"   // MetaWear SDK
+    // compileOnly flutter.jar is no longer needed: the loader plugin
+    // adds the proper `flutter_embedding_debug` artefact automatically.
+}

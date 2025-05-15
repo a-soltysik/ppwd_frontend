@@ -17,9 +17,11 @@ pluginManagement {
 }
 
 plugins {
-    id("dev.flutter.flutter-plugin-loader") version "1.0.0"
+    id("dev.flutter.flutter-plugin-loader")
     id("com.android.application") version "8.7.0" apply false
     id("org.jetbrains.kotlin.android") version "1.8.22" apply false
 }
 
 include(":app")
+include(":board_plugin")
+project(":board_plugin").projectDir = File(rootProject.projectDir, "../board_plugin/android")

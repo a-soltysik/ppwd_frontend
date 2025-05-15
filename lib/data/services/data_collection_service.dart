@@ -1,11 +1,17 @@
 import 'dart:async';
-import 'dart:developer';
 
 import 'package:flutter/material.dart';
 
+import '../../core/constants/app_constants.dart';
 import '../../core/models/board.dart';
+import '../../core/network/connection_status_provider.dart';
+import '../../core/utils/logger.dart';
 import '../../data/repositories/board_repository.dart';
 import '../../data/services/board_service.dart';
+
+typedef BatteryUpdateCallback = void Function(int batteryLevel);
+typedef ConnectionStatusCallback =
+    void Function(bool isConnected, int cachedCount);
 
 class DataCollectionService {
   static final DataCollectionService _instance =
@@ -16,64 +22,157 @@ class DataCollectionService {
   DataCollectionService._internal();
 
   Timer? _dataTimer;
-  static const _collectionInterval = Duration(seconds: 60);
+  bool _isCollecting = false;
+  ConnectionStatusCallback? _connectionStatusCallback;
+  StreamSubscription<ConnectionStatus>? _connectionStatusSubscription;
+
+  static const _collectionInterval = AppConstants.dataCollectionInterval;
 
   final BoardService _boardService = BoardService();
+  final ConnectionStatusProvider _connectionProvider =
+      ConnectionStatusProvider();
 
-  void startDataCollection(
-    BuildContext context,
+  void setConnectionStatusCallback(ConnectionStatusCallback callback) {
+    _connectionStatusCallback = callback;
+
+    _notifyConnectionStatus();
+    _monitorConnectionStatus();
+  }
+
+  void _notifyConnectionStatus() {
+    _connectionStatusCallback?.call(
+      _connectionProvider.isConnected,
+      _connectionProvider.cachedRequestsCount,
+    );
+  }
+
+  void _monitorConnectionStatus() {
+    _connectionStatusSubscription?.cancel();
+
+    _connectionStatusSubscription = _connectionProvider.statusStream.listen(
+      (status) {
+        Logger.i(
+          'Network: connected=${status.isConnected}, cached=${status.cachedRequestsCount}',
+        );
+
+        _connectionStatusCallback?.call(
+          status.isConnected,
+          status.cachedRequestsCount,
+        );
+
+        if (status.isConnected && status.cachedRequestsCount > 0) {
+          Logger.i('Connection restored - sending cached data');
+          sendCachedData();
+        }
+      },
+      onError: (error) {
+        Logger.e('Connection status error', error: error);
+      },
+    );
+  }
+
+  Future<void> startDataCollection(
+    BuildContext? context,
     BoardRepository repository,
     String macAddress,
-    Function(int) onBatteryUpdated,
+    BatteryUpdateCallback onBatteryUpdated,
+  ) async {
+    await stopDataCollection();
+
+    Logger.i('Starting data collection for device: $macAddress');
+    _isCollecting = true;
+
+    _scheduleDataCollection(context, repository, macAddress, onBatteryUpdated);
+
+    await collectAndSendData(context, repository, macAddress, onBatteryUpdated);
+
+    if (_connectionProvider.isConnected &&
+        _connectionProvider.cachedRequestsCount > 0) {
+      await sendCachedData();
+    }
+  }
+
+  void _scheduleDataCollection(
+    BuildContext? context,
+    BoardRepository repository,
+    String macAddress,
+    BatteryUpdateCallback onBatteryUpdated,
   ) {
-    stopDataCollection();
-
-    log('Starting data collection for device: $macAddress');
-
     _dataTimer = Timer.periodic(_collectionInterval, (timer) {
       collectAndSendData(context, repository, macAddress, onBatteryUpdated);
     });
-
-    collectAndSendData(context, repository, macAddress, onBatteryUpdated);
   }
 
-  void stopDataCollection() {
+  Future<void> stopDataCollection() async {
+    _isCollecting = false;
     if (_dataTimer != null) {
-      log('Stopping data collection');
+      Logger.i('Stopping data collection');
       _dataTimer?.cancel();
       _dataTimer = null;
     }
+
+    _connectionStatusSubscription?.cancel();
+    _connectionStatusSubscription = null;
   }
 
+  bool isCollecting() => _isCollecting;
+
   Future<void> collectAndSendData(
-    BuildContext context,
+    BuildContext? context,
     BoardRepository repository,
     String macAddress,
-    Function(int) onBatteryUpdated,
+    BatteryUpdateCallback onBatteryUpdated,
   ) async {
+    Logger.d("Collecting data for device: $macAddress");
+
     try {
-      final data = await repository.getModuleData(context);
+      final measurementsOptional = await repository.getModuleData(context);
 
-      data
-          .filter((list) => list.isNotEmpty)
-          .ifPresent(
-            (measurements) async {
-              await _boardService.sendSensorData(
-                Board(macAddress, measurements),
-              );
+      measurementsOptional.ifPresent((measurements) async {
+        if (measurements.isNotEmpty) {
+          Logger.d("Found data for sensors: ${measurements.keys.join(', ')}");
 
-              (await repository.getBatteryLevel(context)).ifPresent((
-                batteryLevel,
-              ) {
-                onBatteryUpdated(batteryLevel);
-              });
-            },
-            orElse: () {
-              log("No data received from board");
-            },
+          final success = await _boardService.sendSensorData(
+            Board(macAddress, measurements),
           );
+
+          Logger.i(
+            success
+                ? 'Successfully processed sensor data'
+                : 'Failed to process sensor data',
+          );
+
+          if (_connectionProvider.isConnected &&
+              _connectionProvider.cachedRequestsCount > 0) {
+            sendCachedData();
+          }
+        } else {
+          Logger.d("No sensor data available");
+        }
+
+        await _updateBatteryLevel(context, repository, onBatteryUpdated);
+      });
     } catch (e) {
-      log("Error collecting data: $e");
+      Logger.e("Error collecting data", error: e);
     }
+  }
+
+  Future<void> _updateBatteryLevel(
+    BuildContext? context,
+    BoardRepository repository,
+    BatteryUpdateCallback onBatteryUpdated,
+  ) async {
+    final batteryOptional = await repository.getBatteryLevel(context);
+    batteryOptional.ifPresent(onBatteryUpdated);
+  }
+
+  Future<int> sendCachedData() async {
+    if (!_connectionProvider.isConnected) {
+      Logger.w('Cannot send cached data: No internet connection');
+      return 0;
+    }
+
+    Logger.i('Attempting to send cached data...');
+    return await _boardService.sendCachedData();
   }
 }

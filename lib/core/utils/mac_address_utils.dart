@@ -48,6 +48,7 @@ class MacAddressInputFormatter extends TextInputFormatter {
     int originalCursorPos = newValue.selection.baseOffset;
     int newCursorPos = 0;
 
+    // Format the MAC address with colons after every two hex digits
     for (int i = 0; i < text.length && formatted.length < 17; i++) {
       if (hexDigitCount > 0 && hexDigitCount % 2 == 0 && hexDigitCount < 12) {
         formatted.write(':');
@@ -65,6 +66,7 @@ class MacAddressInputFormatter extends TextInputFormatter {
       }
     }
 
+    // Add a colon if the next character would need one
     if (hexDigitCount > 0 && hexDigitCount % 2 == 0 && hexDigitCount < 12) {
       formatted.write(':');
       if (insertedChars == originalCursorPos) {
@@ -242,4 +244,32 @@ class _MacAddressTextFieldState extends State<MacAddressTextField> {
     _removeOverlay();
     super.dispose();
   }
+}
+
+bool isValidMacAddress(String mac) {
+  if (mac.isEmpty) {
+    return false;
+  }
+
+  if (mac.length != 17) {
+    return false;
+  }
+
+  for (int i = 2; i < 17; i += 3) {
+    if (mac[i] != ':') {
+      return false;
+    }
+  }
+
+  for (int i = 0; i < 17; i++) {
+    if (i % 3 == 2) {
+      continue;
+    }
+
+    if (!RegExp(r'[0-9A-Fa-f]').hasMatch(mac[i])) {
+      return false;
+    }
+  }
+
+  return true;
 }

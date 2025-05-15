@@ -1,9 +1,9 @@
-import 'dart:async';
-import 'dart:developer';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:optional/optional.dart';
+import 'package:ppwd_frontend/core/utils/error_handler.dart';
+import 'package:ppwd_frontend/core/utils/logger.dart';
+import 'package:ppwd_frontend/core/utils/user_shared_preference.dart';
 
 import '../../core/models/measurement.dart';
 
@@ -24,199 +24,95 @@ class BoardRepository {
   static const _handleBoardDisconnection = 'handleBoardDisconnection';
   static const _onConnectionSuccess = 'onConnectionSuccess';
 
-  static const _loadingTimeout = Duration(seconds: 30);
-
-  bool isLoading = false;
-  Timer? _loadingTimer;
   ConnectionSuccessCallback? _onConnectionSuccessCallback;
   DisconnectionCallback? _onDisconnectionCallback;
 
+  bool _isConnected = false;
+
+  bool get isConnected => _isConnected;
+
   void setupConnectionHandlers(
-    BuildContext context, {
+    BuildContext? context, {
     required ConnectionSuccessCallback onConnected,
     required DisconnectionCallback onDisconnected,
   }) {
     _onConnectionSuccessCallback = onConnected;
     _onDisconnectionCallback = onDisconnected;
 
+    _setupMethodCallHandler(context);
+  }
+
+  void _setupMethodCallHandler(BuildContext? context) {
     _channel.setMethodCallHandler((call) async {
       switch (call.method) {
         case _onConnectionSuccess:
-          if (_onConnectionSuccessCallback != null) {
-            final Map<dynamic, dynamic> args =
-                call.arguments as Map<dynamic, dynamic>;
-            final String macAddress = args['macAddress'] as String? ?? '';
-            final int batteryLevel = args['batteryLevel'] as int? ?? 0;
-            final List<dynamic> sensorsList =
-                args['activeSensors'] as List<dynamic>? ?? [];
-            final List<String> activeSensors =
-                sensorsList.map((s) => s.toString()).toList();
-
-            log(
-              'Connection successful to $macAddress with ${activeSensors.length} active sensors',
-            );
-
-            _onConnectionSuccessCallback!(
-              macAddress,
-              batteryLevel,
-              activeSensors,
-            );
-          }
+          _handleConnectionSuccess(call.arguments, context);
           break;
         case _handleBoardDisconnection:
-          final reason = call.arguments as String? ?? 'Unknown reason';
-          log('Device disconnected: $reason');
-
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Device disconnected: $reason'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-
-          if (_onDisconnectionCallback != null) {
-            _onDisconnectionCallback!(reason);
-          }
+          _handleDisconnection(call.arguments, context);
           break;
       }
       return null;
     });
   }
 
-  void showLoading(BuildContext context, [String message = 'Loading...']) {
-    if (isLoading) return;
+  void _handleConnectionSuccess(dynamic arguments, BuildContext? context) {
+    if (_onConnectionSuccessCallback == null) return;
 
-    isLoading = true;
+    final args = arguments as Map<dynamic, dynamic>;
+    final macAddress = args['macAddress'] as String? ?? '';
+    final batteryLevel = args['batteryLevel'] as int? ?? 0;
+    final sensorsList = args['activeSensors'] as List<dynamic>? ?? [];
+    final activeSensors = sensorsList.map((s) => s.toString()).toList();
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return AlertDialog(
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const CircularProgressIndicator(),
-              const SizedBox(height: 16),
-              Text(message),
-            ],
-          ),
-        );
-      },
+    _saveConnectionData(macAddress, activeSensors);
+    _onConnectionSuccessCallback!(macAddress, batteryLevel, activeSensors);
+  }
+
+  void _saveConnectionData(
+    String macAddress,
+    List<String> activeSensors,
+  ) async {
+    Logger.i(
+      'Connection successful to $macAddress with ${activeSensors.length} active sensors',
     );
 
-    _loadingTimer = Timer(_loadingTimeout, () {
-      hideLoading(context);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Operation timed out. Please try again.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    });
+    _isConnected = true;
+    await UserSimplePreferences.setMacAddress(macAddress);
   }
 
-  void hideLoading(BuildContext context) {
-    if (!isLoading) return;
+  void _handleDisconnection(dynamic arguments, BuildContext? context) async {
+    final reason = arguments as String? ?? 'Unknown reason';
+    Logger.i('Device disconnected: $reason');
 
-    _loadingTimer?.cancel();
-    _loadingTimer = null;
-    isLoading = false;
+    _isConnected = false;
 
-    if (context.mounted) {
-      Navigator.of(context, rootNavigator: true).pop();
+    if (context != null && context.mounted) {
+      ErrorHandler.showSuccessMessage(context, 'Device disconnected: $reason');
     }
-  }
 
-  Future<Optional<T>> onSuccess<T>(
-    String methodName,
-    Future<T?> Function() operation,
-    BuildContext context,
-  ) async {
-    try {
-      return Optional.ofNullable(await operation());
-    } on PlatformException catch (e) {
-      log("PlatformException: ${e.code}, ${e.message}");
-
-      String errorMessage = e.message ?? 'Unknown error';
-      if (e.code == 'ALREADY_CONNECTING') {
-        errorMessage =
-            'Already attempting to connect to a device. Please wait.';
-      } else if (e.code == 'INVALID_MAC') {
-        errorMessage = 'Invalid MAC address format.';
-      }
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $errorMessage'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-
-      return Optional.empty();
-    } on MissingPluginException {
-      log("Method $methodName is not implemented!");
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Method $methodName is not implemented!'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-
-      return Optional.empty();
-    } catch (e) {
-      log("Unexpected error: $e");
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Unexpected error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-
-      return Optional.empty();
+    if (_onDisconnectionCallback != null) {
+      _onDisconnectionCallback!(reason);
     }
   }
 
   Future<Optional<bool>> connectToDevice(
-    BuildContext context,
+    BuildContext? context,
     String mac,
   ) async {
-    showLoading(context, 'Connecting to device...');
-    var result = await onSuccess(_connectToBoardFunction, () async {
+    return ErrorHandler.handleMethodCall(_connectToBoardFunction, () async {
       await _channel.invokeMethod(_connectToBoardFunction, {'macAddress': mac});
 
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Attempting to connect to $mac'),
-            backgroundColor: Colors.blue,
-          ),
-        );
-      }
+      ErrorHandler.showSuccessMessage(context, 'Attempting to connect to $mac');
 
       return true;
     }, context);
-
-    hideLoading(context);
-    return result;
   }
 
   Future<Optional<Map<String, List<Measurement>>>> getModuleData(
-    BuildContext context,
+    BuildContext? context,
   ) async {
-    return onSuccess(_getModuleDataFunction, () async {
+    return ErrorHandler.handleMethodCall(_getModuleDataFunction, () async {
       final Map<Object?, Object?> rawData = await _channel.invokeMethod(
         _getModuleDataFunction,
       );
@@ -225,44 +121,39 @@ class BoardRepository {
         return <String, List<Measurement>>{};
       }
 
-      return rawData.map((key, value) {
-        List<Measurement> parsedList =
-            (value as List)
-                .map((item) => Measurement(item[0] as String, item[1] as int))
-                .toList();
-        return MapEntry(key as String, parsedList);
-      });
+      return _parseModuleData(rawData);
     }, context);
   }
 
-  Future<Optional<int>> getBatteryLevel(BuildContext context) async {
-    return onSuccess(_getBatteryLevelFunction, () async {
+  Map<String, List<Measurement>> _parseModuleData(
+    Map<Object?, Object?> rawData,
+  ) {
+    return rawData.map((key, value) {
+      List<Measurement> parsedList =
+          (value as List)
+              .map((item) => Measurement(item[0] as String, item[1] as int))
+              .toList();
+      return MapEntry(key as String, parsedList);
+    });
+  }
+
+  Future<Optional<int>> getBatteryLevel(BuildContext? context) async {
+    return ErrorHandler.handleMethodCall(_getBatteryLevelFunction, () async {
       return await _channel.invokeMethod(_getBatteryLevelFunction);
     }, context);
   }
 
-  Future<void> disconnectFromDevice(BuildContext context) async {
+  Future<void> disconnectFromDevice(BuildContext? context) async {
     try {
       await _channel.invokeMethod(_disconnectFromBoardFunction);
+      _isConnected = false;
 
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Disconnected from device'),
-            backgroundColor: Colors.blue,
-          ),
-        );
-      }
+      ErrorHandler.showSuccessMessage(context, 'Disconnected from device');
     } catch (e) {
-      log("Error disconnecting: $e");
+      Logger.e("Error disconnecting", error: e);
 
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error disconnecting: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+      if (context != null && context.mounted) {
+        ErrorHandler.showSuccessMessage(context, 'Error disconnecting: $e');
       }
     }
   }
