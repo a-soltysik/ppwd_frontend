@@ -91,10 +91,11 @@ class _ScanAndConnectWidgetState extends State<ScanAndConnectWidget> {
                         leading: const Icon(Icons.bluetooth, size: 18),
                         trailing: const Icon(Icons.chevron_right, size: 18),
                         onTap: () {
-                          if (mac != null) {
-                            widget.controller.text = mac!;
-                            widget.onConnect(mac!);
-                          }
+                          widget.controller.text =
+                              scanDeviceService.recentDevices[index];
+                          widget.onConnect(
+                            scanDeviceService.recentDevices[index],
+                          );
                         },
                       ),
                     ),
