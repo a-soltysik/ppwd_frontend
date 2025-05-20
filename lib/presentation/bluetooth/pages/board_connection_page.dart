@@ -3,6 +3,7 @@ import 'package:ppwd_frontend/core/utils/format_utils.dart';
 import 'package:ppwd_frontend/core/utils/logger.dart';
 import 'package:ppwd_frontend/core/utils/user_shared_preference.dart';
 import 'package:ppwd_frontend/data/repositories/board_repository.dart';
+import 'package:ppwd_frontend/presentation/bluetooth/widgets/scan_and_connect_widget.dart';
 
 import '../../../core/network/connection_status_provider.dart';
 import '../../../core/theme/app_theme.dart';
@@ -12,7 +13,6 @@ import '../state/connection_state_manager.dart';
 import '../widgets/active_sensor_widget.dart';
 import '../widgets/app_info_card.dart';
 import '../widgets/connection_actions_widget.dart';
-import '../widgets/connection_form.dart';
 import '../widgets/connection_status_card.dart';
 
 class BoardConnectionPage extends StatefulWidget {
@@ -345,7 +345,7 @@ class _BoardConnectionPageState extends State<BoardConnectionPage>
 
             const SizedBox(height: 24),
 
-            ConnectionForm(
+            ScanAndConnectWidget(
               controller: _controller,
               isConnected: isConnected,
               isConnecting: isConnecting,
