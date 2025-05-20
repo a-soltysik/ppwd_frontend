@@ -10,7 +10,7 @@ class ConnectionForm extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final Function(String) onConnect;
   final VoidCallback onDisconnect;
-
+  final VoidCallback onScanPressed;
   const ConnectionForm({
     super.key,
     required this.controller,
@@ -19,18 +19,35 @@ class ConnectionForm extends StatelessWidget {
     required this.formKey,
     required this.onConnect,
     required this.onDisconnect,
+    required this.onScanPressed,
   });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Form(
-          key: formKey,
-          child: MacAddressTextField(
-            controller: controller,
-            enabled: !isConnected && !isConnecting,
-          ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Form(
+                key: formKey,
+                child: MacAddressTextField(
+                  controller: controller,
+                  enabled: !isConnected && !isConnecting,
+                ),
+              ),
+            ),
+            if (!isConnected && !isConnecting)
+              Padding(
+                padding: const EdgeInsets.only(top: 5.0),
+                child: IconButton(
+                  icon: const Icon(Icons.search),
+                  tooltip: 'Scan for devices',
+                  onPressed: onScanPressed,
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: 16),
         if (!isConnected && !isConnecting)

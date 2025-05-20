@@ -45,4 +45,27 @@ class UserSimplePreferences {
     Logger.d('Removing MAC address from preferences');
     return await _preferences!.remove('mac_address');
   }
+
+  static List<String>? getRecentDevices() {
+    if (_preferences == null) {
+      Logger.w('SharedPreferences not initialized when getting recent devices');
+      return null;
+    }
+
+    final List<String>? devices = _preferences!.getStringList(
+      'metawear_devices',
+    );
+    Logger.d('Retrieved recent devices address');
+    return devices;
+  }
+
+  static Future<bool> setRecentDevices(List<String> devices) async {
+    if (_preferences == null) {
+      Logger.w('SharedPreferences not initialized when setting recent devices');
+      await init();
+    }
+
+    Logger.d('Saving recent devices');
+    return await _preferences!.setStringList('metawear_devices', devices);
+  }
 }

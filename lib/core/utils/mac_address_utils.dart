@@ -98,7 +98,7 @@ class MacAddressTextField extends StatelessWidget {
       controller: controller,
       decoration: const InputDecoration(
         border: OutlineInputBorder(),
-        labelText: 'Enter a MAC address of device',
+        labelText: 'Enter a MAC address',
         hintText: 'Format: XX:XX:XX:XX:XX:XX',
         prefixIcon: Icon(Icons.bluetooth),
         helperText: 'Colons will be added automatically',

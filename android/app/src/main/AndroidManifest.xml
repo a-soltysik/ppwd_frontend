@@ -71,6 +71,11 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".MetaWearScannerActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AppCompat.Light.DarkActionBar" />
+            
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
