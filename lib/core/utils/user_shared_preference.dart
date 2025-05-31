@@ -68,4 +68,52 @@ class UserSimplePreferences {
     Logger.d('Saving recent devices');
     return await _preferences!.setStringList('metawear_devices', devices);
   }
+
+  static int? getLastPrediction() {
+    if (_preferences == null) {
+      Logger.w(
+        'SharedPreferences not initialized when getting last prediction',
+      );
+      return null;
+    }
+    return _preferences!.getInt('last_prediction');
+  }
+
+  static Future<bool> setLastPrediction(int prediction) async {
+    if (_preferences == null) {
+      Logger.w(
+        'SharedPreferences not initialized when setting last prediction',
+      );
+      await init();
+    }
+    Logger.d('Saving last prediction: $prediction');
+    return await _preferences!.setInt('last_prediction', prediction);
+  }
+
+  static DateTime? getLastPredictionTime() {
+    if (_preferences == null) {
+      Logger.w(
+        'SharedPreferences not initialized when getting last prediction time',
+      );
+      return null;
+    }
+    final timeString = _preferences!.getString('last_prediction_time');
+    if (timeString != null) {
+      return DateTime.tryParse(timeString);
+    }
+    return null;
+  }
+
+  static Future<bool> setLastPredictionTime(DateTime time) async {
+    if (_preferences == null) {
+      Logger.w(
+        'SharedPreferences not initialized when setting last prediction time',
+      );
+      await init();
+    }
+    return await _preferences!.setString(
+      'last_prediction_time',
+      time.toIso8601String(),
+    );
+  }
 }

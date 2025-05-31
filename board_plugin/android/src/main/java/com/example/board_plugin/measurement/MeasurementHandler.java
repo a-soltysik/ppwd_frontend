@@ -13,7 +13,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class MeasurementHandler {
 
     private static final String TAG = "MeasurementHandler";
-    private static final long dataFetchingPeriodInMillis = 500;
+    private static final long dataFetchingPeriodInMillis = 20;
     private final Map<String, List<List<Object>>> sensorDataBuffer = new ConcurrentHashMap<>();
 
     private static String cleanedUpString(String rawData) {

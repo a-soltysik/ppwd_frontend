@@ -1,21 +1,35 @@
 import 'dart:convert';
 
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/database/database_helper.dart';
 import '../../core/models/board.dart';
+import '../../core/models/prediction_models.dart';
 import '../../core/network/connection_status_provider.dart';
 import '../../core/utils/logger.dart';
 
 class BoardService {
-  final String _apiUrl = AppConstants.apiBaseUrl;
-  final String _apiKey = AppConstants.apiKey;
-  static const _requestTimeout = AppConstants.apiTimeout;
-
+  final Dio _dio;
   final DatabaseHelper _databaseHelper = DatabaseHelper();
   final ConnectionStatusProvider _connectionProvider =
       ConnectionStatusProvider();
+
+  BoardService({Dio? dio}) : _dio = dio ?? _createDio();
+
+  static Dio _createDio() {
+    return Dio(
+      BaseOptions(
+        baseUrl: AppConstants.apiBaseUrl,
+        connectTimeout: AppConstants.apiTimeout,
+        receiveTimeout: AppConstants.apiTimeout,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Api-Key': AppConstants.apiKey,
+        },
+      ),
+    );
+  }
 
   Future<bool> sendSensorData(Board boardData) async {
     await _connectionProvider.checkConnectivity();
@@ -26,59 +40,36 @@ class BoardService {
     }
 
     try {
-      final jsonData = jsonEncode(boardData);
-      Logger.d('Sending data to $_apiUrl: $jsonData');
-
-      final http.Response response = await http
-          .post(
-            Uri.parse('$_apiUrl/api/measurements'),
-            headers: {'Content-Type': 'application/json', 'X-Api-Key': _apiKey},
-            body: jsonData,
-          )
-          .timeout(_requestTimeout);
-
-      if (response.statusCode == 201) {
-        Logger.i('Data sent successfully');
-        return true;
-      } else {
-        Logger.w('Error sending data: HTTP ${response.statusCode}');
-        Logger.w('Response body: ${response.body}');
-
-        return _cacheRequest(boardData);
-      }
+      await _dio.post('/api/measurements', data: boardData.toJson());
+      Logger.i('Data sent successfully');
+      return true;
+    } on DioException catch (e) {
+      Logger.w(
+        'Error sending data: ${e.response?.statusCode ?? 'No response'}',
+      );
+      return _cacheRequest(boardData);
     } catch (e) {
       Logger.e('Exception sending sensor data', error: e);
-
       return _cacheRequest(boardData);
     }
   }
 
   Future<bool> _cacheRequest(Board boardData) async {
     try {
-      final jsonData = jsonEncode(boardData);
-      var deviceId = boardData.macAddress;
-
-      var timestamp = DateTime.now().millisecondsSinceEpoch;
-      const typeId = "sensor_data";
-
-      Logger.i('--------------------------------');
-      Logger.i('CACHING DATA FOR LATER SENDING:');
-      Logger.i('Device: $deviceId');
-      Logger.i('Timestamp: $timestamp');
-      Logger.d('Data: $jsonData');
-      Logger.i('--------------------------------');
+      final jsonData = jsonEncode(boardData.toJson());
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
 
       await _databaseHelper.insertCachedRequest(
         requestBody: jsonData,
-        deviceId: deviceId,
+        deviceId: boardData.macAddress,
         timestamp: timestamp,
-        typeId: typeId,
+        typeId: "sensor_data",
       );
 
-      int cachedCount = await _databaseHelper.getCachedRequestsCount();
+      final cachedCount = await _databaseHelper.getCachedRequestsCount();
       _connectionProvider.updateCachedRequestsCount(cachedCount);
 
-      Logger.i('Cached successfully. Total: $cachedCount');
+      Logger.i('Data cached successfully. Total: $cachedCount');
       return true;
     } catch (e) {
       Logger.e('Cache error', error: e);
@@ -104,56 +95,30 @@ class BoardService {
       }
 
       Logger.i('Sending ${cachedRequests.length} cached requests');
-      final url = Uri.parse('$_apiUrl/api/measurements');
 
       for (var request in cachedRequests) {
+        final requestId = request['id'] as int;
+        final requestBody = request['request_body'] as String;
+
         try {
-          final requestId = request['id'] as int;
-          final requestBody = request['request_body'] as String;
+          await _dio.post('/api/measurements', data: jsonDecode(requestBody));
+          await _databaseHelper.deleteCachedRequest(requestId);
+          sentCount++;
+          Logger.i('Sent cached request ID: $requestId');
+        } on DioException catch (e) {
+          final statusCode = e.response?.statusCode ?? 0;
 
-          Logger.d('Sending cached request ID: $requestId');
-          Logger.d('Request body: $requestBody');
-
-          final response = await http
-              .post(
-                url,
-                headers: {
-                  'Content-Type': 'application/json',
-                  'X-Api-Key': _apiKey,
-                },
-                body: requestBody,
-              )
-              .timeout(_requestTimeout);
-
-          if (response.statusCode == 201) {
-            Logger.i('Sent request with ID: $requestId');
+          if (statusCode >= 500) {
+            Logger.w('Server error, will retry remaining requests later');
+            break;
+          } else if (statusCode >= 400 && statusCode < 500) {
+            Logger.w('Client error, removing invalid request');
             await _databaseHelper.deleteCachedRequest(requestId);
-            sentCount++;
-          } else {
-            Logger.w(
-              'Error sending cached request: HTTP ${response.statusCode}',
-            );
-            Logger.w('Response body: ${response.body}');
-
-            if (response.statusCode >= 500) {
-              Logger.w(
-                'Server error detected, will retry remaining requests later',
-              );
-              break;
-            }
-
-            if (response.statusCode >= 400 && response.statusCode < 500) {
-              Logger.w('Client error detected, removing invalid request');
-              await _databaseHelper.deleteCachedRequest(requestId);
-            }
           }
-        } catch (e) {
-          Logger.e('Exception sending cached request', error: e);
-          break;
         }
       }
 
-      int remainingCount = await _databaseHelper.getCachedRequestsCount();
+      final remainingCount = await _databaseHelper.getCachedRequestsCount();
       _connectionProvider.updateCachedRequestsCount(remainingCount);
 
       Logger.i('Sent $sentCount cached requests. Remaining: $remainingCount');
@@ -161,6 +126,60 @@ class BoardService {
     } catch (e) {
       Logger.e('Error in sendCachedData', error: e);
       return 0;
+    }
+  }
+
+  Future<int?> getPrediction(Board boardData) async {
+    await _connectionProvider.checkConnectivity();
+
+    if (!_connectionProvider.isConnected) {
+      Logger.w('No internet - cannot get prediction');
+      return null;
+    }
+
+    try {
+      final response = await _dio.post(
+        '/api/predict',
+        data: boardData.toJson(),
+      );
+      final prediction = PredictionResponse.fromJson(response.data);
+      Logger.i('Prediction: ${prediction.prediction}');
+      return prediction.prediction;
+    } on DioException catch (e) {
+      Logger.w('Prediction error: ${e.response?.statusCode ?? 'No response'}');
+      return null;
+    } catch (e) {
+      Logger.e('Prediction exception', error: e);
+      return null;
+    }
+  }
+
+  Future<List<HistoryItem>?> getHistory(
+    String startDate,
+    String endDate,
+  ) async {
+    await _connectionProvider.checkConnectivity();
+
+    if (!_connectionProvider.isConnected) {
+      Logger.w('No internet - cannot get history');
+      return null;
+    }
+
+    try {
+      final response = await _dio.get(
+        '/api/history',
+        queryParameters: {'start_date': startDate, 'end_date': endDate},
+      );
+
+      final history = HistoryResponse.fromJson(response.data);
+      Logger.i('History: ${history.predictions.length} items');
+      return history.predictions;
+    } on DioException catch (e) {
+      Logger.w('History error: ${e.response?.statusCode ?? 'No response'}');
+      return null;
+    } catch (e) {
+      Logger.e('History exception', error: e);
+      return null;
     }
   }
 }

@@ -10,19 +10,21 @@ class ActiveSensorsWidget extends StatelessWidget {
     this.isConnected = false,
   });
 
-  static const Map<String, String> allSensors = {
-    'Accelerometer':
-        'Measures acceleration forces in X, Y, and Z axes. Used for detecting motion and orientation.',
-    'Ambient Light': 'Measures environmental light levels in lux.',
-    'Barometer': 'Measures atmospheric pressure and can determine altitude.',
-    'Color Sensor': 'Detects RGB color values of objects.',
-    'Gyroscope':
-        'Measures rotational velocity around X, Y, and Z axes. Used for detecting precise orientation changes.',
-    'Humidity Sensor':
-        'Measures relative humidity in the air. Used for environmental monitoring.',
-    'Magnetometer': 'Measures magnetic field strength and direction.',
-    'Proximity Sensor': 'Detects nearby objects without physical contact.',
-    'Battery': 'Monitors device battery level. Used for power management.',
+  static const Map<String, SensorInfo> _sensorInfoMap = {
+    'Accelerometer': SensorInfo(
+      description:
+          'Measures acceleration forces in X, Y, and Z axes. Used for detecting motion and orientation.',
+      icon: Icons.speed,
+    ),
+    'Gyroscope': SensorInfo(
+      description:
+          'Measures rotational velocity around X, Y, and Z axes. Used for detecting precise orientation changes.',
+      icon: Icons.rotate_90_degrees_ccw,
+    ),
+    'Battery': SensorInfo(
+      description: 'Monitors device battery level. Used for power management.',
+      icon: Icons.battery_full,
+    ),
   };
 
   @override
@@ -49,16 +51,6 @@ class ActiveSensorsWidget extends StatelessWidget {
       );
     }
 
-    final sortedSensors =
-        allSensors.keys.toList()..sort((a, b) {
-          final aActive = activeSensors.contains(a);
-          final bActive = activeSensors.contains(b);
-          if (aActive != bActive) {
-            return aActive ? -1 : 1;
-          }
-          return a.compareTo(b);
-        });
-
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -70,7 +62,7 @@ class ActiveSensorsWidget extends StatelessWidget {
                 const Icon(Icons.sensors, color: Colors.green),
                 const SizedBox(width: 8),
                 Text(
-                  'Device Sensors (${activeSensors.length}/${allSensors.length} active)',
+                  'Device Sensors (${activeSensors.length}/${_sensorInfoMap.length} active)',
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -79,31 +71,15 @@ class ActiveSensorsWidget extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
-            Wrap(
-              spacing: 8.0,
-              runSpacing: 8.0,
+            // Fixed layout: Row with Expanded for equal spacing of 3 sensors
+            Row(
               children:
-                  sortedSensors.map((sensor) {
-                    final bool isActive = activeSensors.contains(sensor);
-
-                    return InkWell(
-                      onTap: () => _showSensorInfo(context, sensor, isActive),
-                      child: Chip(
-                        avatar: _getIconForSensor(sensor, isActive),
-                        label: Text(
-                          sensor,
-                          style: TextStyle(
-                            color: isActive ? Colors.black : Colors.black54,
-                          ),
-                        ),
-                        backgroundColor:
-                            isActive
-                                ? Colors.green.shade50
-                                : Colors.grey.shade200,
-                        side: BorderSide(
-                          color: isActive ? Colors.green : Colors.grey.shade400,
-                          width: 1,
-                        ),
+                  _sensorInfoMap.keys.map((sensor) {
+                    final isActive = activeSensors.contains(sensor);
+                    return Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                        child: _buildSensorChip(context, sensor, isActive),
                       ),
                     );
                   }).toList(),
@@ -124,14 +100,64 @@ class ActiveSensorsWidget extends StatelessWidget {
     );
   }
 
-  void _showSensorInfo(BuildContext context, String sensorName, bool isActive) {
+  Widget _buildSensorChip(BuildContext context, String sensor, bool isActive) {
+    final sensorInfo = _sensorInfoMap[sensor]!;
+
+    return InkWell(
+      onTap: () => _showSensorDialog(context, sensor, isActive, sensorInfo),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        decoration: BoxDecoration(
+          color: isActive ? Colors.green.shade50 : Colors.grey.shade200,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isActive ? Colors.green : Colors.grey.shade400,
+            width: 1,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircleAvatar(
+              backgroundColor: isActive ? Colors.green : Colors.grey,
+              radius: 16,
+              child: Icon(sensorInfo.icon, size: 16, color: Colors.white),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              sensor,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: isActive ? Colors.black : Colors.black54,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showSensorDialog(
+    BuildContext context,
+    String sensorName,
+    bool isActive,
+    SensorInfo info,
+  ) {
     showDialog(
       context: context,
       builder:
           (context) => AlertDialog(
             title: Row(
               children: [
-                _getIconForSensor(sensorName, isActive, size: 24),
+                CircleAvatar(
+                  backgroundColor: isActive ? Colors.green : Colors.grey,
+                  radius: 12,
+                  child: Icon(info.icon, size: 12, color: Colors.white),
+                ),
                 const SizedBox(width: 8),
                 Text(sensorName),
               ],
@@ -140,7 +166,6 @@ class ActiveSensorsWidget extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Status indicator
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8,
@@ -163,13 +188,8 @@ class ActiveSensorsWidget extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                // Description
-                Text(
-                  allSensors[sensorName] ?? 'No description available',
-                  style: const TextStyle(fontSize: 16),
-                ),
+                Text(info.description, style: const TextStyle(fontSize: 16)),
                 const SizedBox(height: 16),
-                // Sample data if active
                 if (isActive)
                   const Text(
                     'Data from this sensor will be collected and can be viewed in the Graphs tab.',
@@ -186,38 +206,11 @@ class ActiveSensorsWidget extends StatelessWidget {
           ),
     );
   }
+}
 
-  Widget _getIconForSensor(
-    String sensorName,
-    bool isActive, {
-    double size = 12,
-  }) {
-    IconData iconData = Icons.sensors;
+class SensorInfo {
+  final String description;
+  final IconData icon;
 
-    if (sensorName.contains('Accelerometer')) {
-      iconData = Icons.speed;
-    } else if (sensorName.contains('Gyroscope')) {
-      iconData = Icons.rotate_90_degrees_ccw;
-    } else if (sensorName.contains('Magnetometer')) {
-      iconData = Icons.compass_calibration;
-    } else if (sensorName.contains('Ambient Light')) {
-      iconData = Icons.lightbulb;
-    } else if (sensorName.contains('Barometer')) {
-      iconData = Icons.compress;
-    } else if (sensorName.contains('Humidity')) {
-      iconData = Icons.water_drop;
-    } else if (sensorName.contains('Color')) {
-      iconData = Icons.color_lens;
-    } else if (sensorName.contains('Proximity')) {
-      iconData = Icons.nearby_error;
-    } else if (sensorName.contains('Battery')) {
-      iconData = Icons.battery_full;
-    }
-
-    return CircleAvatar(
-      backgroundColor: isActive ? Colors.green : Colors.grey,
-      radius: size,
-      child: Icon(iconData, size: size, color: Colors.white),
-    );
-  }
+  const SensorInfo({required this.description, required this.icon});
 }

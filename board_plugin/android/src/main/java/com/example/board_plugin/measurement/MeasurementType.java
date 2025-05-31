@@ -4,14 +4,7 @@ import androidx.annotation.NonNull;
 
 public enum MeasurementType {
     ACCELERATION("acceleration"),
-    ILLUMINANCE("illuminance"),
-    ALTITUDE("altitude"),
-    PRESSURE("pressure"),
-    COLOR_ADC("colorAdc"),
-    ANGULAR_VELOCITY("angularVelocity"),
-    HUMIDITY("humidity"),
-    MAGNETIC_FIELD("magneticField"),
-    PROXIMITY_ADC("proximityAdc");
+    ANGULAR_VELOCITY("angularVelocity");
 
     private final String name;
 

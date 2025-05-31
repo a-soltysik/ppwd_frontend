@@ -272,6 +272,8 @@ public class BluetoothConnectionManager implements ServiceConnection {
 
             setupManager.setBoard(serviceBinder.getMetaWearBoard(device));
 
+            setupDisconnectHandler();
+
             Log.d(TAG, "Connecting to device: " + macAddress);
             setupManager.getBoard().connectAsync().continueWith(task -> {
                 if (task.isFaulted()) {
@@ -283,6 +285,38 @@ public class BluetoothConnectionManager implements ServiceConnection {
             });
         } catch (Exception e) {
             handleError("Connection error: " + e.getMessage());
+        }
+    }
+
+    private void setupDisconnectHandler() {
+        if (setupManager.getBoard() != null) {
+            setupManager.getBoard().onUnexpectedDisconnect(status -> {
+                Log.w(TAG, "MetaWear board unexpectedly disconnected with status: " + status);
+
+                mainHandler.post(() -> {
+                    if (!isShutdownRequested) {
+                        reset();
+
+                        // Show notification
+                        int appIconId = ResourceHelper.getAppIconResourceId(context);
+                        NotificationHelper notificationHelper = new NotificationHelper(context, appIconId);
+                        notificationHelper.showBluetoothDisconnectionNotification(
+                                "Device disconnected unexpectedly (status: " + status + ")"
+                        );
+
+                        if (connectionCallback != null) {
+                            connectionCallback.onDisconnection("Device disconnected unexpectedly");
+                        }
+
+                        mainHandler.postDelayed(() -> {
+                            if (!isShutdownRequested && !macAddress.isEmpty()) {
+                                Log.i(TAG, "Attempting to reconnect after unexpected disconnect");
+                                connectToDevice(macAddress);
+                            }
+                        }, 3000);
+                    }
+                });
+            });
         }
     }
 
@@ -302,16 +336,9 @@ public class BluetoothConnectionManager implements ServiceConnection {
             Log.w(TAG, "Cannot setup sensors: board is null or not connected");
             return;
         }
-
         try {
             setupManager.setupAccelerometer();
-            setupManager.setupAmbientLight();
-            setupManager.setupBarometer();
-            setupManager.setupColorTcs();
             setupManager.setupGyro();
-            setupManager.setupHumidity();
-            setupManager.setupMagnetometer();
-            setupManager.setupProximity();
             setupManager.setupSettings();
         } catch (Exception e) {
             Log.e(TAG, "Error setting up sensors", e);
