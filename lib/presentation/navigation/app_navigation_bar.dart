@@ -33,7 +33,7 @@ class AppNavigationBarState extends State<AppNavigationBar> {
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.show_chart),
-            label: 'Graphs',
+            label: 'Analytics',
           ),
         ],
       ),

@@ -3,6 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_constants.dart';
+import '../../../core/models/activity_type.dart';
 import '../../../core/models/prediction_models.dart';
 import '../../../core/theme/app_theme.dart';
 
@@ -30,8 +31,6 @@ class _SensorDataPageState extends State<SensorDataPage>
   List<HistoryItem>? _history;
   bool _loading = false;
   String _selectedTimeRange = '1 hour';
-  late AnimationController _chartAnimationController;
-  late Animation<double> _chartAnimation;
 
   final List<TimeRangeOption> _timeRangeOptions = [
     TimeRangeOption('5 min', '5m', const Duration(minutes: 5), Icons.timer),
@@ -42,26 +41,16 @@ class _SensorDataPageState extends State<SensorDataPage>
   @override
   void initState() {
     super.initState();
-    _chartAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
-      vsync: this,
-    );
-    _chartAnimation = CurvedAnimation(
-      parent: _chartAnimationController,
-      curve: Curves.easeInOutCubic,
-    );
     _loadHistory();
   }
 
   @override
   void dispose() {
-    _chartAnimationController.dispose();
     super.dispose();
   }
 
   Future<void> _loadHistory() async {
     setState(() => _loading = true);
-    _chartAnimationController.reset();
 
     final selectedOption = _timeRangeOptions.firstWhere(
       (option) => option.label == _selectedTimeRange,
@@ -84,7 +73,6 @@ class _SensorDataPageState extends State<SensorDataPage>
           _history = history.predictions;
           _loading = false;
         });
-        _chartAnimationController.forward();
       } else {
         setState(() {
           _history = null;
@@ -103,7 +91,7 @@ class _SensorDataPageState extends State<SensorDataPage>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Prediction Analytics"),
+        title: const Text("Activity Analytics"),
         backgroundColor: AppTheme.primaryColor,
         foregroundColor: AppTheme.textLightColor,
         elevation: 0,
@@ -260,46 +248,6 @@ class _SensorDataPageState extends State<SensorDataPage>
     );
   }
 
-  Widget _buildStatCard(
-    String title,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 12,
-              color: color.withOpacity(0.8),
-              fontWeight: FontWeight.w500,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildChartCard() {
     final counts = <int, int>{};
     for (final item in _history!) {
@@ -322,7 +270,7 @@ class _SensorDataPageState extends State<SensorDataPage>
                 ),
                 const SizedBox(width: 12),
                 Text(
-                  'Prediction Distribution',
+                  'Activity Distribution',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -334,57 +282,52 @@ class _SensorDataPageState extends State<SensorDataPage>
             const SizedBox(height: 24),
             SizedBox(
               height: 300,
-              child: AnimatedBuilder(
-                animation: _chartAnimation,
-                builder: (context, child) {
-                  return PieChart(
-                    PieChartData(
-                      sectionsSpace: 4,
-                      centerSpaceRadius: 60,
-                      startDegreeOffset: -90,
-                      sections:
-                          counts.entries.map((entry) {
-                            final percentage =
-                                (entry.value / _history!.length) * 100;
-                            final color = _getGradientColor(entry.key);
-                            return PieChartSectionData(
-                              value: percentage * _chartAnimation.value,
-                              title: '${entry.key}\n${percentage.round()}%',
+              child: PieChart(
+                PieChartData(
+                  sectionsSpace: 4,
+                  centerSpaceRadius: 60,
+                  startDegreeOffset: -90,
+                  sections:
+                      counts.entries.map((entry) {
+                        final percentage =
+                            (entry.value / _history!.length) * 100;
+                        final activityType = ActivityType.fromValue(entry.key);
+                        final color = _getActivityColor(activityType);
+
+                        return PieChartSectionData(
+                          value: percentage,
+                          title:
+                              '${activityType.displayName}\n${percentage.round()}%',
+                          color: color,
+                          radius: 100,
+                          titleStyle: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                          badgeWidget: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
                               color: color,
-                              radius: 80 + (20 * _chartAnimation.value),
-                              titleStyle: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                              badgeWidget: Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: color,
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: color.withOpacity(0.5),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: color.withOpacity(0.5),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
                                 ),
-                                child: Text(
-                                  entry.value.toString(),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                              badgePositionPercentageOffset: 1.2,
-                            );
-                          }).toList(),
-                    ),
-                  );
-                },
+                              ],
+                            ),
+                            child: Icon(
+                              _getActivityIcon(activityType),
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                          ),
+                          badgePositionPercentageOffset: 1.2,
+                        );
+                      }).toList(),
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -397,15 +340,16 @@ class _SensorDataPageState extends State<SensorDataPage>
 
   Widget _buildLegend(Map<int, int> counts) {
     return Wrap(
-      spacing: 16,
+      spacing: 12,
       runSpacing: 8,
       children:
           counts.entries.map((entry) {
-            final color = _getGradientColor(entry.key);
+            final activityType = ActivityType.fromValue(entry.key);
+            final color = _getActivityColor(activityType);
             final percentage = (entry.value / _history!.length) * 100;
 
             return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: color.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(20),
@@ -414,17 +358,10 @@ class _SensorDataPageState extends State<SensorDataPage>
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: color,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
+                  Icon(_getActivityIcon(activityType), color: color, size: 16),
                   const SizedBox(width: 6),
                   Text(
-                    'Value ${entry.key} (${percentage.round()}%)',
+                    '${activityType.displayName} (${percentage.round()}%)',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
@@ -442,7 +379,7 @@ class _SensorDataPageState extends State<SensorDataPage>
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Container(
+      child: SizedBox(
         height: 150,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -453,7 +390,7 @@ class _SensorDataPageState extends State<SensorDataPage>
             ),
             const SizedBox(height: 12),
             Text(
-              'Loading Analytics...',
+              'Loading Activity Analytics...',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
@@ -488,7 +425,7 @@ class _SensorDataPageState extends State<SensorDataPage>
             ),
             const SizedBox(height: 20),
             Text(
-              'No Data Available',
+              'No Activity Data Available',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -497,7 +434,7 @@ class _SensorDataPageState extends State<SensorDataPage>
             ),
             const SizedBox(height: 8),
             Text(
-              'No prediction history found for the selected time range.\nTry selecting a different time period or check back later.',
+              'No activity history found for the selected time range.\nTry selecting a different time period or check back later.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 14, color: Colors.grey[500]),
             ),
@@ -524,16 +461,38 @@ class _SensorDataPageState extends State<SensorDataPage>
     );
   }
 
-  Color _getGradientColor(int prediction) {
-    final gradientColors = [
-      const Color(0xFF667eea),
-      const Color(0xFF764ba2),
-      const Color(0xFFf093fb),
-      const Color(0xFFf5576c),
-      const Color(0xFF4facfe),
-      const Color(0xFF00f2fe),
-    ];
-    return gradientColors[prediction % gradientColors.length];
+  Color _getActivityColor(ActivityType activity) {
+    switch (activity) {
+      case ActivityType.laying:
+        return const Color(0xFF2196F3); // Blue
+      case ActivityType.sitting:
+        return const Color(0xFF9C27B0); // Purple
+      case ActivityType.standing:
+        return const Color(0xFF4CAF50); // Green
+      case ActivityType.walking:
+        return const Color(0xFFFF9800); // Orange
+      case ActivityType.walkingDownstairs:
+        return const Color(0xFFF44336); // Red
+      case ActivityType.walkingUpstairs:
+        return const Color(0xFF3F51B5); // Indigo
+    }
+  }
+
+  IconData _getActivityIcon(ActivityType activity) {
+    switch (activity) {
+      case ActivityType.laying:
+        return Icons.hotel;
+      case ActivityType.sitting:
+        return Icons.chair;
+      case ActivityType.standing:
+        return Icons.person;
+      case ActivityType.walking:
+        return Icons.directions_walk;
+      case ActivityType.walkingDownstairs:
+        return Icons.keyboard_arrow_down;
+      case ActivityType.walkingUpstairs:
+        return Icons.keyboard_arrow_up;
+    }
   }
 }
 

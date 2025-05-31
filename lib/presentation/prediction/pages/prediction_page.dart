@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/models/activity_type.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/user_shared_preference.dart';
 import '../../../data/repositories/board_repository.dart';
@@ -15,7 +16,6 @@ class PredictionPage extends StatefulWidget {
 class _PredictionPageState extends State<PredictionPage> {
   late final PredictionService _service;
 
-  // Simple state variables instead of complex state classes
   bool _isLoading = false;
   bool _hasError = false;
   String _errorMessage = '';
@@ -103,7 +103,7 @@ class _PredictionPageState extends State<PredictionPage> {
 
   AppBar _buildAppBar() {
     return AppBar(
-      title: const Text("Live Predictions"),
+      title: const Text("Live Activity Detection"),
       backgroundColor: AppTheme.primaryColor,
       foregroundColor: AppTheme.textLightColor,
       actions: [
@@ -141,10 +141,10 @@ class _PredictionPageState extends State<PredictionPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.psychology, color: AppTheme.primaryColor),
+                Icon(Icons.directions_run, color: AppTheme.primaryColor),
                 const SizedBox(width: 8),
                 Text(
-                  "AI Predictions",
+                  "AI Activity Recognition",
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -155,8 +155,7 @@ class _PredictionPageState extends State<PredictionPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              "Real-time AI predictions based on sensor data.\n"
-              "Updates automatically every 2.5 seconds while on this page.",
+              "Real-time AI detection of your physical activity.",
               textAlign: TextAlign.center,
               style: TextStyle(color: AppTheme.textPrimaryColor),
             ),
@@ -186,10 +185,10 @@ class _PredictionPageState extends State<PredictionPage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(Icons.psychology, color: AppTheme.primaryColor, size: 28),
+        Icon(Icons.directions_run, color: AppTheme.primaryColor, size: 28),
         const SizedBox(width: 12),
         Text(
-          'Current Prediction',
+          'Current Activity',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
@@ -229,7 +228,7 @@ class _PredictionPageState extends State<PredictionPage> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Connect to a device in the Connect tab to see predictions',
+          'Connect to a device in the Connect tab to detect activities',
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 14, color: Colors.grey[600]),
         ),
@@ -266,7 +265,7 @@ class _PredictionPageState extends State<PredictionPage> {
         const CircularProgressIndicator(),
         const SizedBox(height: 16),
         Text(
-          'Getting First Prediction...',
+          'Detecting Activity...',
           style: TextStyle(fontSize: 18, color: Colors.grey[600]),
         ),
       ],
@@ -297,35 +296,63 @@ class _PredictionPageState extends State<PredictionPage> {
 
   Widget _buildPredictionValue() {
     final isLive = _service.isTimerActive;
+    final activityType = ActivityType.fromValue(_currentPrediction!);
 
     return Column(
       children: [
         Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: AppTheme.primaryColor.withOpacity(0.1),
-            shape: BoxShape.circle,
-            border: Border.all(color: AppTheme.primaryColor, width: 3),
-          ),
-          child: Text(
-            _currentPrediction.toString(),
-            style: TextStyle(
-              fontSize: 56,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.primaryColor,
+            color: _getActivityColor(activityType).withAlpha(25),
+            shape: BoxShape.rectangle,
+            border: Border.all(
+              color: _getActivityColor(activityType),
+              width: 3,
             ),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            children: [
+              Icon(
+                _getActivityIcon(activityType),
+                size: 72,
+                color: _getActivityColor(activityType),
+              ),
+              Text(
+                activityType.displayName,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: _getActivityColor(activityType),
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 16),
-        Text(
-          'Prediction Value',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            color: Colors.grey[600],
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.grey[100],
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.grey[300]!),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'ID: ${_currentPrediction}',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey[700],
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 16),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -456,8 +483,8 @@ class _PredictionPageState extends State<PredictionPage> {
           Expanded(
             child: Text(
               _service.isTimerActive
-                  ? 'Getting live predictions every 2.5 seconds while on this page.'
-                  : 'Showing last cached prediction. Return to this page for live updates.',
+                  ? 'Getting live activity detection every 2.5 seconds while on this page.'
+                  : 'Showing last detected activity. Return to this page for live updates.',
               style: TextStyle(color: Colors.blue[700], fontSize: 12),
             ),
           ),
@@ -476,6 +503,40 @@ class _PredictionPageState extends State<PredictionPage> {
       return '${(diff / 60).round()}m ago';
     } else {
       return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+    }
+  }
+
+  Color _getActivityColor(ActivityType activity) {
+    switch (activity) {
+      case ActivityType.laying:
+        return Colors.blue;
+      case ActivityType.sitting:
+        return Colors.purple;
+      case ActivityType.standing:
+        return Colors.green;
+      case ActivityType.walking:
+        return Colors.orange;
+      case ActivityType.walkingDownstairs:
+        return Colors.red;
+      case ActivityType.walkingUpstairs:
+        return Colors.indigo;
+    }
+  }
+
+  IconData _getActivityIcon(ActivityType activity) {
+    switch (activity) {
+      case ActivityType.laying:
+        return Icons.hotel;
+      case ActivityType.sitting:
+        return Icons.chair;
+      case ActivityType.standing:
+        return Icons.person;
+      case ActivityType.walking:
+        return Icons.directions_walk;
+      case ActivityType.walkingDownstairs:
+        return Icons.keyboard_arrow_down;
+      case ActivityType.walkingUpstairs:
+        return Icons.keyboard_arrow_up;
     }
   }
 }
