@@ -5,7 +5,6 @@ import 'package:dio/dio.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/database/database_helper.dart';
 import '../../core/models/board.dart';
-import '../../core/models/prediction_models.dart';
 import '../../core/network/connection_status_provider.dart';
 import '../../core/utils/logger.dart';
 
@@ -126,60 +125,6 @@ class BoardService {
     } catch (e) {
       Logger.e('Error in sendCachedData', error: e);
       return 0;
-    }
-  }
-
-  Future<int?> getPrediction(Board boardData) async {
-    await _connectionProvider.checkConnectivity();
-
-    if (!_connectionProvider.isConnected) {
-      Logger.w('No internet - cannot get prediction');
-      return null;
-    }
-
-    try {
-      final response = await _dio.post(
-        '/api/predict',
-        data: boardData.toJson(),
-      );
-      final prediction = PredictionResponse.fromJson(response.data);
-      Logger.i('Prediction: ${prediction.prediction}');
-      return prediction.prediction;
-    } on DioException catch (e) {
-      Logger.w('Prediction error: ${e.response?.statusCode ?? 'No response'}');
-      return null;
-    } catch (e) {
-      Logger.e('Prediction exception', error: e);
-      return null;
-    }
-  }
-
-  Future<List<HistoryItem>?> getHistory(
-    String startDate,
-    String endDate,
-  ) async {
-    await _connectionProvider.checkConnectivity();
-
-    if (!_connectionProvider.isConnected) {
-      Logger.w('No internet - cannot get history');
-      return null;
-    }
-
-    try {
-      final response = await _dio.get(
-        '/api/history',
-        queryParameters: {'start_date': startDate, 'end_date': endDate},
-      );
-
-      final history = HistoryResponse.fromJson(response.data);
-      Logger.i('History: ${history.predictions.length} items');
-      return history.predictions;
-    } on DioException catch (e) {
-      Logger.w('History error: ${e.response?.statusCode ?? 'No response'}');
-      return null;
-    } catch (e) {
-      Logger.e('History exception', error: e);
-      return null;
     }
   }
 }

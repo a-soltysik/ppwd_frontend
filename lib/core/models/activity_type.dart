@@ -1,9 +1,9 @@
 enum ActivityType {
-  laying(0, 'Laying Down'),
-  sitting(1, 'Sitting'),
-  standing(2, 'Standing'),
-  walking(3, 'Walking'),
-  walkingDownstairs(4, 'Walking Downstairs'),
+  laying(1, 'Laying Down'),
+  sitting(4, 'Sitting'),
+  standing(3, 'Standing'),
+  walking(0, 'Walking'),
+  walkingDownstairs(2, 'Walking Downstairs'),
   walkingUpstairs(5, 'Walking Upstairs');
 
   const ActivityType(this.value, this.displayName);

@@ -6,6 +6,8 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/models/activity_type.dart';
 import '../../../core/models/prediction_models.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/logger.dart';
+import '../../../core/utils/user_shared_preference.dart'; // Dodany import
 
 class SensorDataPage extends StatefulWidget {
   const SensorDataPage({super.key});
@@ -30,7 +32,7 @@ class _SensorDataPageState extends State<SensorDataPage>
 
   List<HistoryItem>? _history;
   bool _loading = false;
-  String _selectedTimeRange = '1 hour';
+  String _selectedTimeRange = '5 min';
 
   final List<TimeRangeOption> _timeRangeOptions = [
     TimeRangeOption('5 min', '5m', const Duration(minutes: 5), Icons.timer),
@@ -52,6 +54,15 @@ class _SensorDataPageState extends State<SensorDataPage>
   Future<void> _loadHistory() async {
     setState(() => _loading = true);
 
+    final macAddress = UserSimplePreferences.getMacAddress();
+    if (macAddress == null || macAddress.isEmpty) {
+      setState(() {
+        _history = null;
+        _loading = false;
+      });
+      return;
+    }
+
     final selectedOption = _timeRangeOptions.firstWhere(
       (option) => option.label == _selectedTimeRange,
     );
@@ -62,24 +73,30 @@ class _SensorDataPageState extends State<SensorDataPage>
       final response = await _dio.get(
         '/api/history',
         queryParameters: {
-          'start_date': startDate.toIso8601String(),
-          'end_date': endDate.toIso8601String(),
+          'start_date':
+              startDate.subtract(const Duration(hours: 2)).toIso8601String(),
+          'end_date':
+              endDate.subtract(const Duration(hours: 2)).toIso8601String(),
+          'mac_address': macAddress,
         },
       );
 
       if (response.statusCode == 200) {
         final history = HistoryResponse.fromJson(response.data);
+        Logger.w(history.predictions.toString());
         setState(() {
           _history = history.predictions;
           _loading = false;
         });
       } else {
+        Logger.w(response.toString());
         setState(() {
           _history = null;
           _loading = false;
         });
       }
     } catch (e) {
+      Logger.w(e.toString());
       setState(() {
         _history = null;
         _loading = false;
@@ -330,7 +347,7 @@ class _SensorDataPageState extends State<SensorDataPage>
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 50),
             _buildLegend(counts),
           ],
         ),
@@ -404,6 +421,9 @@ class _SensorDataPageState extends State<SensorDataPage>
   }
 
   Widget _buildNoDataCard() {
+    final macAddress = UserSimplePreferences.getMacAddress();
+    final isDeviceConnected = macAddress != null && macAddress.isNotEmpty;
+
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -418,14 +438,18 @@ class _SensorDataPageState extends State<SensorDataPage>
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                Icons.analytics_outlined,
+                isDeviceConnected
+                    ? Icons.analytics_outlined
+                    : Icons.bluetooth_disabled,
                 size: 48,
                 color: Colors.grey[400],
               ),
             ),
             const SizedBox(height: 20),
             Text(
-              'No Activity Data Available',
+              isDeviceConnected
+                  ? 'No Activity Data Available'
+                  : 'No Device Connected',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -434,15 +458,19 @@ class _SensorDataPageState extends State<SensorDataPage>
             ),
             const SizedBox(height: 8),
             Text(
-              'No activity history found for the selected time range.\nTry selecting a different time period or check back later.',
+              isDeviceConnected
+                  ? 'No activity history found for the selected time range.\nTry selecting a different time period or check back later.'
+                  : 'Please connect to a device in the Connect tab to view activity analytics.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 14, color: Colors.grey[500]),
             ),
             const SizedBox(height: 20),
             ElevatedButton.icon(
-              onPressed: _loadHistory,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Retry'),
+              onPressed: isDeviceConnected ? _loadHistory : null,
+              icon: Icon(
+                isDeviceConnected ? Icons.refresh_rounded : Icons.bluetooth,
+              ),
+              label: Text(isDeviceConnected ? 'Retry' : 'Connect Device'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primaryColor,
                 foregroundColor: Colors.white,
